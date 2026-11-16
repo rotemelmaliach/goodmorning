@@ -1,0 +1,66 @@
+name: TestFlight
+
+# Run by hand from the Actions tab. Needs, in the repo's Actions settings:
+#   secrets:   ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8 (App Store Connect API key)
+#   variable:  APPLE_TEAM_ID
+on:
+  workflow_dispatch:
+
+jobs:
+  upload:
+    runs-on: macos-26
+    env:
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+      APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+      KEY_PATH: ${{ runner.temp }}/AuthKey.p8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check configuration
+        run: |
+          for name in ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_P8 APPLE_TEAM_ID; do
+            if [ -z "${!name}" ]; then echo "::error::$name is not set"; exit 1; fi
+          done
+          printf '%s' "$ASC_KEY_P8" > "$KEY_PATH"
+      - run: brew install xcodegen
+      - run: xcodegen generate
+      - name: Archive
+        run: >
+          xcodebuild archive
+          -project GoodMorning.xcodeproj
+          -scheme GoodMorning
+          -destination 'generic/platform=iOS'
+          -archivePath "$RUNNER_TEMP/GoodMorning.xcarchive"
+          -allowProvisioningUpdates
+          -authenticationKeyPath "$KEY_PATH"
+          -authenticationKeyID "$ASC_KEY_ID"
+          -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+          DEVELOPMENT_TEAM="$APPLE_TEAM_ID"
+          CODE_SIGN_STYLE=Automatic
+          CURRENT_PROJECT_VERSION="${{ github.run_number }}"
+      - name: Upload to App Store Connect
+        run: |
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>destination</key><string>upload</string>
+            <key>teamID</key><string>$APPLE_TEAM_ID</string>
+            <key>signingStyle</key><string>automatic</string>
+          </dict>
+          </plist>
+          EOF
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/GoodMorning.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -exportPath "$RUNNER_TEMP/export" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$KEY_PATH" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+      - name: Remove key
+        if: always()
+        run: rm -f "$KEY_PATH"
