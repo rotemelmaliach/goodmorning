@@ -1,0 +1,68 @@
+# XcodeGen spec. The .xcodeproj is generated from this on the CI Mac (`xcodegen generate`)
+# and is not committed.
+name: GoodMorning
+options:
+  bundleIdPrefix: com.rotemelmaliach
+  deploymentTarget:
+    iOS: "26.0"
+    watchOS: "26.0"
+packages:
+  GoodMorningCore:
+    path: Packages/GoodMorningCore
+settings:
+  base:
+    # App targets stay in Swift 5 language mode for now: they wrap callback-heavy Apple
+    # frameworks. The core package is Swift 6 with full concurrency checking.
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+targets:
+  GoodMorning:
+    type: application
+    platform: iOS
+    sources: [App/GoodMorning]
+    dependencies:
+      - package: GoodMorningCore
+      - target: GoodMorningWatch
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.rotemelmaliach.goodmorning
+        TARGETED_DEVICE_FAMILY: "1"
+    info:
+      path: App/GoodMorning/Info.plist
+      properties:
+        CFBundleDisplayName: Good Morning
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        UIBackgroundModes: [audio]
+        ITSAppUsesNonExemptEncryption: false
+        NSAlarmKitUsageDescription: Good Morning schedules your wake-up alarms.
+        NSCameraUsageDescription: The front camera counts your exercise reps. Nothing is recorded.
+        NSMotionUsageDescription: Step counting confirms you got out of bed.
+        NSHealthShareUsageDescription: Heart rate from your Apple Watch confirms you are active.
+        NSHealthUpdateUsageDescription: Your morning routine is saved as a workout.
+    entitlements:
+      path: App/GoodMorning/GoodMorning.entitlements
+      properties:
+        com.apple.developer.healthkit: true
+  GoodMorningWatch:
+    type: application
+    platform: watchOS
+    sources: [App/GoodMorningWatch]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.rotemelmaliach.goodmorning.watchkitapp
+    info:
+      path: App/GoodMorningWatch/Info.plist
+      properties:
+        CFBundleDisplayName: Good Morning
+        WKApplication: true
+        WKCompanionAppBundleIdentifier: com.rotemelmaliach.goodmorning
+        WKBackgroundModes: [workout-processing]
+        NSHealthShareUsageDescription: Heart rate confirms you are active during your morning routine.
+        NSHealthUpdateUsageDescription: Your morning routine is saved as a workout.
+    entitlements:
+      path: App/GoodMorningWatch/GoodMorningWatch.entitlements
+      properties:
+        com.apple.developer.healthkit: true
