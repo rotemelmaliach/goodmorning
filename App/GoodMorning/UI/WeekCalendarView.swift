@@ -14,34 +14,59 @@ struct WeekCalendarView: View {
             HStack(spacing: 6) {
                 ForEach(1...7, id: \.self) { weekday in
                     Button {
-                        selected = weekday
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) { selected = weekday }
                     } label: {
-                        VStack(spacing: 6) {
-                            Text(calendar.veryShortWeekdaySymbols[weekday - 1])
-                                .font(.caption.bold())
-                            Text(label(for: weekday))
-                                .font(.caption2)
-                                .monospacedDigit()
-                                .minimumScaleFactor(0.7)
-                                .lineLimit(1)
-                        }
-                        .frame(maxWidth: .infinity, minHeight: 52)
-                        .foregroundStyle(schedule.times[weekday] == nil ? .secondary : .primary)
-                        .background(
-                            selected == weekday ? Color.accentColor.opacity(0.25) : Color.secondary.opacity(0.12),
-                            in: RoundedRectangle(cornerRadius: 10)
-                        )
+                        dayTile(weekday)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(PressableStyle())
                     .accessibilityLabel("\(calendar.weekdaySymbols[weekday - 1]), \(label(for: weekday))")
                 }
             }
 
-            Toggle("\(calendar.weekdaySymbols[selected - 1]) alarm", isOn: enabledBinding)
-            if schedule.times[selected] != nil {
-                DatePicker("Wake up at", selection: timeBinding, displayedComponents: .hourAndMinute)
+            VStack(spacing: 12) {
+                Toggle(isOn: enabledBinding) {
+                    Text("\(calendar.weekdaySymbols[selected - 1]) alarm")
+                        .font(Theme.body.weight(.medium))
+                        .foregroundStyle(Theme.ink)
+                }
+                .tint(Theme.sage)
+
+                if schedule.times[selected] != nil {
+                    HStack(spacing: 10) {
+                        Button("−15 min") { shift(-15) }.buttonStyle(SoftButtonStyle())
+                        Spacer(minLength: 0)
+                        DatePicker("Wake up at", selection: timeBinding, displayedComponents: .hourAndMinute)
+                            .labelsHidden()
+                        Spacer(minLength: 0)
+                        Button("+15 min") { shift(15) }.buttonStyle(SoftButtonStyle())
+                    }
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+                }
             }
+            .padding(14)
+            .background(Theme.canvas, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         }
+    }
+
+    private func dayTile(_ weekday: Int) -> some View {
+        let isOn = schedule.times[weekday] != nil
+        let isSelected = selected == weekday
+        return VStack(spacing: 6) {
+            Text(calendar.veryShortWeekdaySymbols[weekday - 1])
+                .font(.system(.caption, design: .rounded).weight(.bold))
+            Text(label(for: weekday))
+                .font(.system(.caption2, design: .rounded).weight(.medium))
+                .monospacedDigit()
+                .minimumScaleFactor(0.7)
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, minHeight: 58)
+        .foregroundStyle(isSelected ? Color.white : (isOn ? Theme.ink : Theme.inkSoft.opacity(0.7)))
+        .background {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(isSelected ? AnyShapeStyle(Theme.glow) : AnyShapeStyle(isOn ? Theme.peach.opacity(0.45) : Theme.line.opacity(0.6)))
+        }
+        .scaleEffect(isSelected ? 1.06 : 1)
     }
 
     private func label(for weekday: Int) -> String {
@@ -49,11 +74,17 @@ struct WeekCalendarView: View {
         return String(format: "%d:%02d", time.hour, time.minute)
     }
 
+    private func shift(_ minutes: Int) {
+        guard let time = schedule.times[selected] else { return }
+        let total = ((time.hour * 60 + time.minute + minutes) % 1440 + 1440) % 1440
+        withAnimation(.snappy) { schedule.times[selected] = WakeTime(hour: total / 60, minute: total % 60) }
+    }
+
     private var enabledBinding: Binding<Bool> {
         Binding {
             schedule.times[selected] != nil
         } set: { isOn in
-            schedule.times[selected] = isOn ? WakeTime(hour: 7, minute: 30) : nil
+            withAnimation(.snappy) { schedule.times[selected] = isOn ? WakeTime(hour: 7, minute: 30) : nil }
         }
     }
 

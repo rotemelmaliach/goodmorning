@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Good Morning UI Lab</title>
+<style>
+  /* Tokens mirror App/GoodMorning/UI/Theme.swift, name for name. */
+  :root {
+    --canvas: #FFF4EA; --card: #FFFBF6; --peach: #FFD0A8; --apricot: #F0A878;
+    --terracotta: #C56B4B; --clay: #9E4A33; --sage: #7A8C6E; --sageSoft: #DDE5D3;
+    --sun: #F5DF98; --ink: #3F2A20; --inkSoft: #806A5B; --line: #F0DCCB;
+    --dawnTop: #FFE2C6; --glowStart: #F2B184; --glowMid: #D9805C;
+    --glow: linear-gradient(135deg, var(--glowStart), var(--glowMid), var(--terracotta));
+    --dawn: linear-gradient(180deg, var(--dawnTop), var(--canvas) 38%);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #2b211c; color: #f6ebe1; font: 15px/1.45 ui-rounded, "SF Pro Rounded", "Segoe UI", system-ui, sans-serif; }
+  header.lab { padding: 20px 24px 8px; }
+  header.lab h1 { margin: 0 0 4px; font-size: 22px; }
+  header.lab p { margin: 0; color: #cbb8a9; max-width: 70ch; }
+  .tokens { display: flex; flex-wrap: wrap; gap: 8px; padding: 14px 24px; align-items: center; }
+  .tokens label { display: flex; align-items: center; gap: 6px; background: #3a2d26; padding: 5px 9px 5px 5px; border-radius: 999px; font-size: 12px; }
+  .tokens input { width: 26px; height: 26px; border: 0; padding: 0; background: none; border-radius: 50%; cursor: pointer; }
+  .tokens button, .lab-btn { background: #f6ebe1; color: #2b211c; border: 0; border-radius: 999px; padding: 8px 14px; font: inherit; font-weight: 600; cursor: pointer; }
+  #export { margin: 0 24px; padding: 12px; background: #1f1814; border-radius: 12px; font: 12px/1.5 ui-monospace, Consolas, monospace; white-space: pre-wrap; display: none; }
+  .shelf { display: flex; gap: 28px; padding: 20px 24px 40px; overflow-x: auto; align-items: flex-start; }
+  figure { margin: 0; flex: none; }
+  figcaption { margin-bottom: 10px; font-weight: 600; color: #e9d8ca; }
+  figcaption small { display: block; font-weight: 400; color: #b6a292; }
+
+  .phone { width: 340px; height: 720px; border-radius: 44px; background: var(--dawn); color: var(--ink); overflow: hidden; position: relative; box-shadow: 0 0 0 9px #14100d, 0 24px 50px #0008; }
+  .scroll { height: 100%; overflow-y: auto; padding: 44px 16px 26px; scrollbar-width: none; }
+  .col { height: 100%; padding: 50px 18px 22px; display: flex; flex-direction: column; gap: 16px; }
+  .soft { color: var(--inkSoft); } .cap { font-size: 12.5px; }
+  h2 { font-size: 27px; line-height: 1.15; margin: 0; text-align: center; }
+  .center { text-align: center; }
+
+  .hero { background: var(--glow); color: #fff; border-radius: 28px; padding: 20px; position: relative; overflow: hidden; box-shadow: 0 10px 22px color-mix(in srgb, var(--terracotta) 32%, transparent); }
+  .hero::after { content: ""; position: absolute; right: -50px; top: -70px; width: 180px; height: 180px; border-radius: 50%; background: var(--sun); opacity: .55; filter: blur(28px); }
+  .hero .row { display: flex; justify-content: space-between; align-items: center; font-weight: 600; font-size: 13px; position: relative; z-index: 1; }
+  .pill { background: #fff3; padding: 5px 10px; border-radius: 999px; font-size: 12px; }
+  .hero .time { font-size: 62px; font-weight: 700; line-height: 1.05; position: relative; z-index: 1; font-variant-numeric: tabular-nums; }
+  .card { background: var(--card); border-radius: 24px; padding: 16px; margin-top: 16px; box-shadow: 0 6px 16px color-mix(in srgb, var(--clay) 9%, transparent); }
+  .card h3 { margin: 0 0 12px; font-size: 16px; }
+  .card h3 i { color: var(--terracotta); font-style: normal; margin-right: 6px; }
+
+  button.tap { font: inherit; color: inherit; border: 0; cursor: pointer; transition: transform .18s cubic-bezier(.3,1.6,.5,1), opacity .15s; }
+  button.tap:active { transform: scale(.94); opacity: .85; }
+  .week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
+  .day { background: color-mix(in srgb, var(--peach) 45%, transparent); border-radius: 13px; padding: 9px 0; display: grid; gap: 3px; font-size: 11px; }
+  .day b { font-size: 12px; } .day.off { background: color-mix(in srgb, var(--line) 60%, transparent); color: var(--inkSoft); }
+  .day.sel { background: var(--glow); color: #fff; transform: scale(1.06); }
+  .editor { background: var(--canvas); border-radius: 17px; padding: 12px; margin-top: 14px; display: grid; gap: 10px; }
+  .editor .row { display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
+  .switch { width: 48px; height: 29px; border-radius: 999px; background: var(--line); position: relative; }
+  .switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 23px; height: 23px; border-radius: 50%; background: #fff; transition: left .2s; box-shadow: 0 1px 3px #0003; }
+  .switch.on { background: var(--sage); } .switch.on::after { left: 22px; }
+  .softbtn { background: color-mix(in srgb, var(--peach) 42%, transparent); color: var(--clay) !important; font-weight: 600 !important; font-size: 13px !important; padding: 9px 14px; border-radius: 999px; }
+  .timebox { background: var(--line); border-radius: 9px; padding: 6px 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .choices { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; margin-bottom: 10px; }
+  .choice { background: color-mix(in srgb, var(--peach) 35%, transparent); border-radius: 17px; min-height: 82px; display: grid; place-content: center; gap: 6px; font-size: 12px; font-weight: 600; }
+  .choice span { font-size: 24px; } .choice.sel { background: var(--glow); color: #fff; }
+  .sound { display: flex; align-items: center; gap: 11px; padding: 9px; border-radius: 15px; background: var(--canvas); margin-bottom: 7px; }
+  .sound.sel { background: color-mix(in srgb, var(--sageSoft) 60%, transparent); }
+  .sound .play { width: 37px; height: 37px; border-radius: 50%; background: var(--terracotta); color: #fff; font-size: 12px; flex: none; }
+  .sound .play.on { background: var(--sage); }
+  .sound .pick { flex: 1; display: flex; justify-content: space-between; align-items: center; background: none; text-align: left; }
+  .sound .pick b { display: block; } .sound .dot { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--line); }
+  .sound.sel .dot { background: var(--sage); border-color: var(--sage); box-shadow: inset 0 0 0 4px var(--card); }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; }
+  .stat { background: var(--canvas); border-radius: 15px; padding: 11px 4px; text-align: center; }
+  .stat b { display: block; font-size: 24px; }
+  .primary { width: 100%; background: var(--glow); color: #fff !important; font-size: 18px !important; font-weight: 600 !important; padding: 17px; border-radius: 999px; box-shadow: 0 6px 14px color-mix(in srgb, var(--terracotta) 35%, transparent); margin-top: 18px; }
+
+  .bar { display: flex; gap: 4px; } .bar i { flex: 1; height: 6px; border-radius: 3px; background: var(--line); }
+  .bar i.done { background: var(--sage); } .bar i.now { background: var(--terracotta); }
+  .meta { display: flex; justify-content: space-between; align-items: center; font-size: 12.5px; font-weight: 600; color: var(--inkSoft); margin-top: -6px; }
+  .bell { background: var(--terracotta); color: #fff; padding: 4px 10px; border-radius: 999px; animation: pulse 1.6s infinite; }
+  .belloff { color: var(--sage); }
+  @keyframes pulse { 50% { opacity: .55; } }
+  .grow { flex: 1; display: grid; place-items: center; }
+  .ring { width: 240px; height: 240px; position: relative; display: grid; place-items: center; }
+  .ring svg { position: absolute; inset: 0; transform: rotate(-90deg); }
+  .ring circle { fill: none; stroke-width: 14; stroke: var(--line); }
+  .ring circle.p { stroke: var(--terracotta); stroke-linecap: round; transition: stroke-dashoffset .5s; }
+  .ring .n { font-size: 80px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+  .icon { width: 176px; height: 176px; border-radius: 50%; background: color-mix(in srgb, var(--peach) 45%, transparent); display: grid; place-items: center; font-size: 78px; }
+  .cam { flex: 1; border-radius: 28px; position: relative; overflow: hidden; border: 4px solid var(--sage); background: radial-gradient(120% 90% at 50% 20%, #8d7b6f, #54463e 60%, #3b302b); box-shadow: 0 8px 18px color-mix(in srgb, var(--clay) 18%, transparent); }
+  .cam.warn { border-color: var(--peach); } .cam.warn::before { content: ""; position: absolute; inset: 0; background: #0004; }
+  .cam svg.body { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .person { fill: #c9a892; opacity: .55; }
+  .stick { stroke: #fff; stroke-width: 7; stroke-linecap: round; stroke-linejoin: round; fill: none; filter: drop-shadow(0 0 3px #0006); }
+  .hint { position: absolute; top: 13px; left: 50%; transform: translateX(-50%); white-space: nowrap; background: color-mix(in srgb, var(--card) 94%, transparent); padding: 8px 14px; border-radius: 999px; font-weight: 600; font-size: 14px; }
+  .count { position: absolute; right: 13px; bottom: 13px; width: 100px; height: 100px; border-radius: 50%; background: #0006; display: grid; place-items: center; color: #fff; font-size: 30px; font-weight: 700; }
+  .count svg { position: absolute; inset: 0; transform: rotate(-90deg); }
+  .count circle { fill: none; stroke-width: 9; stroke: #fff3; } .count circle.p { stroke: var(--sun); stroke-linecap: round; transition: stroke-dashoffset .3s; }
+  .sunicon { font-size: 96px; animation: rise 1s cubic-bezier(.3,1.5,.5,1); }
+  @keyframes rise { from { transform: scale(.5) rotate(-40deg); } }
+  .streak { background: color-mix(in srgb, var(--peach) 50%, transparent); color: var(--clay); font-weight: 600; padding: 9px 16px; border-radius: 999px; }
+</style>
+</head>
+<body>
+<header class="lab">
+  <h1>Good Morning · UI Lab</h1>
+  <p>Every screen of the app, drawn with the same colour tokens as <code>Theme.swift</code>. Change a colour below and all screens update. Buttons are live: tap days, sounds, choices. This is a browser sketch of the SwiftUI screens, so spacing and fonts are close but not pixel-identical to the phone.</p>
+</header>
+<div class="tokens" id="tokens"></div>
+<div class="tokens" style="padding-top:0">
+  <button id="copy">Show tokens to copy</button>
+  <button id="reset">Reset colours</button>
+</div>
+<pre id="export"></pre>
+
+<div class="shelf">
+  <figure>
+    <figcaption>Home<small>HomeView · scroll inside the phone</small></figcaption>
+    <div class="phone"><div class="scroll">
+      <div class="hero">
+        <div class="row"><span>Good Morning</span><span class="pill">🔥 4 day streak</span></div>
+        <div class="time" id="heroTime">7:30</div>
+        <div style="position:relative;z-index:1;font-weight:500">Next wake-up · Tomorrow</div>
+      </div>
+      <div class="card"><h3><i>▦</i>Your week</h3>
+        <div class="week" id="week"></div>
+        <div class="editor">
+          <div class="row"><span id="dayName">Sunday alarm</span><button class="tap switch on" id="daySwitch" aria-label="Alarm on or off"></button></div>
+          <div class="row" id="timeRow"><button class="tap softbtn" data-shift="-15">−15 min</button><span class="timebox" id="dayTime">7:30</span><button class="tap softbtn" data-shift="15">+15 min</button></div>
+        </div>
+      </div>
+      <div class="card"><h3><i>◈</i>Stops the alarm</h3>
+        <div class="choices" id="choices">
+          <button class="tap choice sel"><span>🔁</span>Rotate</button>
+          <button class="tap choice"><span>🤸</span>Jumping jacks</button>
+          <button class="tap choice"><span>🏋️</span>Squats</button>
+        </div>
+        <div class="soft cap">One set of 20 reps, counted by the camera. The alarm keeps going until the last one. There is no other way to stop it.</div>
+      </div>
+      <div class="card"><h3><i>♪</i>Alarm sound</h3>
+        <div id="sounds"></div>
+        <div class="soft cap">Every sound starts barely audible and swells slowly.</div>
+      </div>
+      <div class="card"><h3><i>☾</i>Tomorrow</h3>
+        <button class="tap softbtn" id="skip">Skip tomorrow</button>
+        <div class="soft cap" style="margin-top:10px">The only way out of a routine is to excuse the day the night before.</div>
+      </div>
+      <div class="card"><h3><i>↗</i>Progress</h3>
+        <div class="stats"><div class="stat"><b>4</b><span class="soft cap">day streak</span></div><div class="stat"><b>11</b><span class="soft cap">mornings done</span></div><div class="stat"><b>6:42</b><span class="soft cap">last routine</span></div></div>
+      </div>
+      <button class="tap primary">▶ Try the routine now</button>
+    </div></div>
+  </figure>
+
+  <figure>
+    <figcaption>1 · Sit up<small>timer step, alarm ringing</small></figcaption>
+    <div class="phone"><div class="col">
+      <div class="bar" data-step="0"></div><div class="meta"><span>Step 1 of 13</span><span class="bell">🔔 Alarm on</span></div>
+      <h2>Sit up</h2><div class="soft center">Feet on the floor. Stay seated for 10 seconds before you stand.</div>
+      <div class="grow"><div class="ring"><svg viewBox="0 0 240 240"><circle cx="120" cy="120" r="113"/><circle class="p" id="sitRing" cx="120" cy="120" r="113" stroke-dasharray="710" stroke-dashoffset="710"/></svg><div class="center"><div class="n" id="sitN">10</div><div class="soft">seconds</div></div></div></div>
+    </div></div>
+  </figure>
+
+  <figure>
+    <figcaption>2 · Lights on<small>tap step (also face, water)</small></figcaption>
+    <div class="phone"><div class="col">
+      <div class="bar" data-step="1"></div><div class="meta"><span>Step 2 of 13</span><span class="bell">🔔 Alarm on</span></div>
+      <h2>Lights on</h2><div class="soft center">Turn on the lights or open the curtains, then tap.</div>
+      <div class="grow"><div class="icon">💡</div></div>
+      <button class="tap primary">✓ Done</button>
+    </div></div>
+  </figure>
+
+  <figure>
+    <figcaption>3 · Step back<small>first camera step, before counting</small></figcaption>
+    <div class="phone"><div class="col">
+      <div class="bar" data-step="2"></div><div class="meta"><span>Step 3 of 13</span><span class="bell">🔔 Alarm on</span></div>
+      <h2>20 jumping jacks to stop the alarm</h2><div class="soft center">Prop the phone up and take a few steps back. Head to hips in view is enough.</div>
+      <div class="cam warn">
+        <svg class="body" viewBox="0 0 300 400"><g transform="translate(150 250) scale(1.9)"><circle class="person" cx="0" cy="-70" r="22"/><rect class="person" x="-34" y="-44" width="68" height="120" rx="22"/><path class="stick" d="M0-44V20M-30-40H30M-30-40L-44 10M30-40L44 10"/><circle class="stick" cx="0" cy="-70" r="18"/></g></svg>
+        <div class="hint">⤢ Take a few steps back</div>
+        <div class="count"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="45"/></svg><span>20</span></div>
+      </div>
+    </div></div>
+  </figure>
+
+  <figure>
+    <figcaption>3 · Counting reps<small>stick figure follows the body · live demo</small></figcaption>
+    <div class="phone"><div class="col">
+      <div class="bar" data-step="2"></div><div class="meta"><span>Step 3 of 13</span><span class="bell">🔔 Alarm on</span></div>
+      <h2>20 jumping jacks to stop the alarm</h2><div class="soft center">Prop the phone up and take a few steps back. Head to hips in view is enough.</div>
+      <div class="cam">
+        <svg class="body" viewBox="0 0 300 400"><g transform="translate(150 215)"><circle class="person" cx="0" cy="-70" r="24"/><rect class="person" x="-36" y="-44" width="72" height="130" rx="24"/><rect class="person" x="-34" y="70" width="28" height="130" rx="13"/><rect class="person" x="6" y="70" width="28" height="130" rx="13"/><path class="stick" id="jack" d=""/><circle class="stick" cx="0" cy="-70" r="18"/></g></svg>
+        <div class="count"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="45"/><circle class="p" id="repRing" cx="50" cy="50" r="45" stroke-dasharray="283" stroke-dashoffset="283"/></svg><span id="repN">20</span></div>
+      </div>
+    </div></div>
+  </figure>
+
+  <figure>
+    <figcaption>4–11 · Stretches<small>alarm off, seconds count while the pose is held</small></figcaption>
+    <div class="phone"><div class="col">
+      <div class="bar" data-step="4"></div><div class="meta"><span>Step 5 of 13</span><span class="belloff">🔕 Alarm off</span></div>
+      <h2>Overhead reach</h2><div class="soft center">Hands together, reach up and rise onto your toes.</div>
+      <div class="cam">
+        <svg class="body" viewBox="0 0 300 400"><g transform="translate(150 225)"><circle class="person" cx="0" cy="-70" r="24"/><rect class="person" x="-36" y="-44" width="72" height="130" rx="24"/><path class="stick" d="M0-44V40M-30-40H30M-30-40L-22-100L-4-150M30-40L22-100L4-150M0 40L-16 44M0 40L16 44M-16 44L-18 130M16 44L18 130"/><circle class="stick" cx="0" cy="-70" r="18"/></g></svg>
+        <div class="count"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="45"/><circle class="p" cx="50" cy="50" r="45" stroke-dasharray="283" stroke-dashoffset="170"/></svg><span>9s</span></div>
+      </div>
+    </div></div>
+  </figure>
+
+  <figure>
+    <figcaption>Done<small>CompletionView</small></figcaption>
+    <div class="phone"><div class="col" style="align-items:center">
+      <div class="grow" style="gap:18px;align-content:center;justify-items:center">
+        <div class="sunicon">☀️</div><h2 style="font-size:42px">You're up.</h2>
+        <div class="soft">Routine done in 6:42.</div><div class="streak">🔥 5 day streak</div>
+      </div>
+      <button class="tap primary">Start the day</button>
+    </div></div>
+  </figure>
+</div>
+
+<script>
+const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
+
+// ---- Colour tokens -------------------------------------------------------
+const TOKENS = ["canvas","card","peach","apricot","terracotta","clay","sage","sageSoft","sun","ink","inkSoft","line","dawnTop","glowStart","glowMid"];
+const root = document.documentElement, defaults = {};
+TOKENS.forEach(name => {
+  defaults[name] = getComputedStyle(root).getPropertyValue("--" + name).trim();
+  const label = document.createElement("label");
+  label.innerHTML = `<input type="color" value="${defaults[name]}">${name}`;
+  label.firstChild.oninput = e => { root.style.setProperty("--" + name, e.target.value); exportTokens(); };
+  $("#tokens").append(label);
+});
+function exportTokens() {
+  $("#export").textContent = "// Paste into Theme.swift (or send these to Claude)\n" + TOKENS.map(n =>
+    `${n}: 0x${getComputedStyle(root).getPropertyValue("--" + n).trim().slice(1).toUpperCase()}`).join("\n");
+}
+$("#copy").onclick = () => { exportTokens(); $("#export").style.display = "block"; };
+$("#reset").onclick = () => { TOKENS.forEach((n, i) => { root.style.removeProperty("--" + n); $$("#tokens input")[i].value = defaults[n]; }); exportTokens(); };
+
+// ---- Week calendar -------------------------------------------------------
+const names = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+const times = [450, 450, 450, 450, 450, 540, 540];  // minutes; null = off. Sun–Thu 7:30, Fri–Sat 9:00
+let selected = 0;
+const fmt = m => `${Math.floor(m / 60)}:${String(m % 60).padStart(2, "0")}`;
+function drawWeek() {
+  $("#week").innerHTML = "";
+  names.forEach((n, i) => {
+    const b = document.createElement("button");
+    b.className = "tap day" + (times[i] == null ? " off" : "") + (i === selected ? " sel" : "");
+    b.innerHTML = `<b>${n[0]}</b><span>${times[i] == null ? "Off" : fmt(times[i])}</span>`;
+    b.onclick = () => { selected = i; drawWeek(); };
+    $("#week").append(b);
+  });
+  $("#dayName").textContent = names[selected] + " alarm";
+  $("#daySwitch").classList.toggle("on", times[selected] != null);
+  $("#timeRow").style.display = times[selected] == null ? "none" : "flex";
+  if (times[selected] != null) $("#dayTime").textContent = fmt(times[selected]);
+  $("#heroTime").textContent = times[0] == null ? "Off" : fmt(times[0]);
+}
+$("#daySwitch").onclick = () => { times[selected] = times[selected] == null ? 450 : null; drawWeek(); };
+$$("[data-shift]").forEach(b => b.onclick = () => { times[selected] = (times[selected] + +b.dataset.shift + 1440) % 1440; drawWeek(); });
+drawWeek();
+
+$$("#choices .choice").forEach(c => c.onclick = () => { $$("#choices .choice").forEach(x => x.classList.remove("sel")); c.classList.add("sel"); });
+$("#skip").onclick = e => { e.target.textContent = "✓ Tomorrow is excused"; e.target.style.color = "var(--sage)"; };
+
+// ---- Sounds: plays the real files when this page is opened from the repo --
+const SOUNDS = [["dawn-chimes","Dawn chimes","Slow, bright bells"],["singing-bowl","Singing bowl","One long, warm tone"],["ocean-waves","Ocean waves","Waves rolling in"],["soft-harp","Soft harp","A gentle rising melody"],["morning-birds","Morning birds","Birdsong over a quiet pad"]];
+let audio = null, playing = null, chosen = "dawn-chimes";
+function drawSounds() {
+  $("#sounds").innerHTML = "";
+  SOUNDS.forEach(([file, title, detail]) => {
+    const row = document.createElement("div");
+    row.className = "sound" + (chosen === file ? " sel" : "");
+    row.innerHTML = `<button class="tap play ${playing === file ? "on" : ""}" aria-label="Play ${title}">${playing === file ? "■" : "▶"}</button>
+      <button class="tap pick"><span><b>${title}</b><span class="soft cap">${detail}</span></span><span class="dot"></span></button>`;
+    row.children[0].onclick = () => {
+      if (audio) audio.pause();
+      if (playing === file) { playing = null; } else {
+        audio = new Audio(`../../App/GoodMorning/Sounds/${file}.wav`);
+        audio.volume = 0.05; audio.play().catch(() => {});
+        const a = audio, swell = setInterval(() => { a.volume = Math.min(0.8, a.volume + 0.04); if (a.paused || a.volume >= 0.8) clearInterval(swell); }, 150);
+        audio.onended = () => { playing = null; drawSounds(); };
+        playing = file;
+      }
+      drawSounds();
+    };
+    row.children[1].onclick = () => { chosen = file; drawSounds(); };
+    $("#sounds").append(row);
+  });
+}
+drawSounds();
+
+// ---- Step bars -----------------------------------------------------------
+$$(".bar").forEach(bar => { const now = +bar.dataset.step; for (let i = 0; i < 13; i++) { const s = document.createElement("i"); s.className = i < now ? "done" : i === now ? "now" : ""; bar.append(s); } });
+
+// ---- Live demos ----------------------------------------------------------
+let sit = 10;
+setInterval(() => { sit = sit <= 0 ? 10 : sit - 1; $("#sitN").textContent = sit; $("#sitRing").style.strokeDashoffset = 710 * sit / 10; }, 1000);
+
+let t = 0, reps = 20, wasUp = false;
+function jack() {
+  t += 0.045;
+  const open = (1 - Math.cos(t * 3)) / 2;                 // 0 closed .. 1 open
+  const arm = (-70 + open * 150) * Math.PI / 180;         // angle of the arm above horizontal
+  const ex = Math.cos(arm) * 38, ey = -Math.sin(arm) * 38;
+  const leg = 8 + open * 30;
+  $("#jack").setAttribute("d",
+    `M0-44V40M-30-40H30` +
+    `M-30-40L${-30 - ex} ${-40 + ey}L${-30 - ex * 2} ${-40 + ey * 2}` +
+    `M30-40L${30 + ex} ${-40 + ey}L${30 + ex * 2} ${-40 + ey * 2}` +
+    `M0 40L-16 44M0 40L16 44M-16 44L${-16 - leg * .5} 110L${-16 - leg} 176M16 44L${16 + leg * .5} 110L${16 + leg} 176`);
+  if (open > 0.9) wasUp = true;
+  if (open < 0.1 && wasUp) { wasUp = false; reps = reps <= 1 ? 20 : reps - 1; $("#repN").textContent = reps; $("#repRing").style.strokeDashoffset = 283 * reps / 20; }
+  requestAnimationFrame(jack);
+}
+jack();
+</script>
+</body>
+</html>

@@ -13,7 +13,10 @@ make it stay quiet is to complete a verified wake-up sequence.
 | Schedule | A wake time per weekday (default 07:30 Sun to Thu, 09:00 Fri and Sat; edited in a weekly calendar on the home screen, any day can be turned off). |
 | Emergency exit | A day can be excused in advance only: at least 6 hours before its alarm. |
 | Never-ending alarm | The in-app alarm rings from the first step until the front camera has counted 20 reps of the day's exercise (jumping jacks, squats, or rotating daily). No fallback: nothing else silences it. |
-| Routine | From `docs/wake-protocol.md`: sit 10 s, lights, 20 reps to stop the alarm, march 20 s, 40 jumping jacks (20 on days when jumping jacks stopped the alarm), eight standing stretches (15 s each, camera-checked), face splash, water. |
+| Routine | From `docs/wake-protocol.md`: sit 10 s, lights, one set of 20 reps to stop the alarm, then straight into eight standing stretches (15 s each, camera-checked), face splash, water. |
+| Alarm sound | Five calming sounds synthesized by `tools/make_sounds.py` (chimes, singing bowl, ocean, harp, birds). The system alarm plays a file with a 20 s fade-in baked in; the in-app alarm ramps from 8% to full over 75 s (`AlarmVolumeRamp`) and jumps to full when a step runs over time. The phone's own volume setting still caps it. |
+| Camera framing | The phone can't see the whole body. The user is asked to step back once (`FramingGate`: head to hips in view), then everything is counted from shoulders and arms: jumping jacks by arms down/up/down, squats by how far the shoulders sink. A white stick figure is drawn over the selfie preview. |
+| Look | Warm dawn palette (cream, peach, terracotta, sage) in `Theme.swift`, mirrored in the browser UI lab at `docs/ui-lab/index.html`. |
 | After the routine | Summary screen with sleep stats, weather and today's calendar. |
 | Verification | Phone pedometer, front camera body pose, Apple Watch heart rate |
 | Build | No Mac. GitHub Actions macOS runner builds; XcodeGen generates the Xcode project from `project.yml`. |
@@ -78,11 +81,14 @@ enforcement is by consequence instead:
 - Pedometer updates lag a few seconds.
 - The rep-gated alarm has no fallback by choice. If the camera cannot see the user (dark room, phone fell, camera permission revoked) the alarm cannot be silenced from inside the app, and the research's "I feel dizzy" alternative is not available while it rings.
 - The walk step was removed at the user's request, so jumping can start right after the 10-second sit. The research protocol asks for about 20 seconds upright before any jumping.
-- Pose thresholds for squats and stretches are tuned on synthetic data only and need calibrating on a real body.
+- Pose thresholds are tuned on synthetic data only and need calibrating on a real body.
+- Counting from the upper body is easier to cheat: raising and lowering both arms counts as a jumping jack, and bobbing the shoulders counts as a squat.
+- The framing gate gives up after 15 s with a body in view and lets counting start anyway, so a badly placed phone can never trap the user with a ringing alarm.
+- A quad stretch can only be checked when the legs are in frame; otherwise staying in view counts.
+- The stick figure assumes the camera frames are mirrored like the preview; if it appears flipped on device, that is the setting to fix (`PoseCameraSensor.configure`).
 - Stretches do not tell left from right; each side bend and quad stretch accepts either side.
 - Parts of the researched protocol are not built yet:
   - lights-on check from camera brightness (currently a tap)
-  - knee-lift counting for the march (currently a timer)
   - QR/NFC anchor at the sink (currently a tap)
   - restart-the-step on timeout (currently the tone escalates only)
   - the 20-minute no-return guard, the "I feel dizzy" alternative, the first-run health screen, and the reaction-time check

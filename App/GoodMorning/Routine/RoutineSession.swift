@@ -19,7 +19,11 @@ final class RoutineSession {
     private(set) var engine: RoutineEngine?
     /// Non-nil while a camera step is running, so the UI can show the preview.
     private(set) var camera: PoseCameraSensor?
+    /// Set when a routine has just been completed, until the user dismisses the summary.
+    var finished: RoutineSummary?
 
+    /// The user is asked to step back once per routine, at its first camera step.
+    private var framedThisRoutine = false
     private var sensor: RoutineSensor?
     private var ticker: Timer?
     private let sound = AlarmSoundPlayer()
@@ -33,6 +37,8 @@ final class RoutineSession {
     /// Entry point from the alarm's stop intent, and from the "test now" button.
     func begin() {
         guard !isActive else { return }
+        finished = nil
+        framedThisRoutine = false
         var engine = RoutineEngine(routine: Store.routine)
         let effects = engine.start(at: .now)
         self.engine = engine
@@ -71,15 +77,17 @@ final class RoutineSession {
                 guard let goal = engine?.routine.steps[index].goal else { continue }
                 startSensor(for: goal)
             case .stepFinished:
-                sensor?.stop()
+                // A camera stays on between consecutive camera steps; see startSensor.
+                if sensor !== camera { sensor?.stop() }
                 sensor = nil
-                camera = nil
             case .alarmSound(let level):
                 sound.set(level)
             case .routineFinished(let summary):
                 ticker?.invalidate()
                 ticker = nil
+                stopCamera()
                 Store.record(summary)
+                finished = summary
                 WatchLink.shared.endWorkout()
                 Task { await rearmAlarms(completedToday: true) }
             }
@@ -88,24 +96,41 @@ final class RoutineSession {
 
     private func startSensor(for goal: StepGoal) {
         switch goal {
+        case .reps(let exercise, _):
+            useCamera(.reps(exercise))
+            return
+        case .stretch(let stretch, _):
+            useCamera(.stretch(stretch))
+            return
         case .walk:
             sensor = PedometerSensor()
-        case .reps(let exercise, _):
-            sensor = makeCamera(.reps(exercise))
-        case .stretch(let stretch, _):
-            sensor = makeCamera(.stretch(stretch))
         case .heartRate:
             sensor = WatchHeartRateSensor()
         case .scanCode, .timer, .confirm:
             sensor = nil  // scanCode: sensor not built yet; timer/confirm need none.
         }
+        stopCamera()
         sensor?.start { [weak self] event in self?.send(event) }
     }
 
-    private func makeCamera(_ mode: PoseCameraSensor.Mode) -> PoseCameraSensor {
-        let camera = PoseCameraSensor(mode: mode)
+    /// Reuses the running camera when the previous step used it too, so the preview
+    /// doesn't blink between stretches.
+    private func useCamera(_ mode: PoseCameraSensor.Mode) {
+        if let camera {
+            camera.switchTo(mode)
+            sensor = camera
+            return
+        }
+        let camera = PoseCameraSensor(mode: mode, requireFraming: !framedThisRoutine)
+        framedThisRoutine = true
         self.camera = camera
-        return camera
+        sensor = camera
+        camera.start { [weak self] event in self?.send(event) }
+    }
+
+    private func stopCamera() {
+        camera?.stop()
+        camera = nil
     }
 }
 
@@ -122,6 +147,12 @@ enum Store {
     static var wakeExercise: Exercise? {
         get { load("wakeExercise") }
         set { save(newValue, "wakeExercise") }
+    }
+
+    /// The calming sound used for the alarm, in the app and for the system alarm.
+    static var alarmSound: AlarmSound {
+        get { load("alarmSound") ?? .dawnChimes }
+        set { save(newValue, "alarmSound") }
     }
 
     static var routine: Routine {

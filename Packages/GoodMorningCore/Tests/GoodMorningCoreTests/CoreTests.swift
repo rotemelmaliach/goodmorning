@@ -117,7 +117,7 @@ private func pose(
 
 @Suite struct JumpingJackCounterTests {
     private func frame(_ time: TimeInterval, open: Bool, confidence: Double = 1) -> PoseFrame {
-        pose(time, wristY: open ? 0.9 : 0.45, ankleSpread: open ? 0.18 : 0.04, confidence: confidence)
+        pose(time, wristY: open ? 0.9 : 0.45, confidence: confidence)
     }
 
     @Test func countsClosedOpenClosedAsOneRep() {
@@ -151,13 +151,13 @@ private func pose(
 }
 
 @Suite struct SquatCounterTests {
-    @Test func countsDownAndUpAndIgnoresHalfSquats() {
+    @Test func countsShoulderDropAndIgnoresHalfSquats() {
         var counter = RepCounter(exercise: .squat)
         #expect(counter.ingest(pose(0)) == .tracking)
-        // Half squat: hips only drop a little. Not a rep.
-        _ = counter.ingest(pose(1, hipY: 0.44))
+        // Half squat: shoulders only sink a little. Not a rep.
+        _ = counter.ingest(pose(1, hipY: 0.46))
         #expect(counter.ingest(pose(2)) == .tracking)
-        // Full squat: hips near knee height, then stand.
+        // Full squat: shoulders sink by more than a shoulder width, then stand.
         #expect(counter.ingest(pose(3, hipY: 0.36)) == .tracking)
         #expect(counter.ingest(pose(4)) == .repCompleted)
         // Starting already crouched doesn't count until the user has stood once.
@@ -165,6 +165,90 @@ private func pose(
         _ = crouched.ingest(pose(0, hipY: 0.36))
         #expect(crouched.ingest(pose(1)) == .tracking)
         #expect(crouched.reps == 0)
+        _ = crouched.ingest(pose(2, hipY: 0.36))
+        #expect(crouched.ingest(pose(3)) == .repCompleted)
+    }
+}
+
+/// The same person with the legs (and optionally hips and hands) out of frame.
+private func cropped(_ frame: PoseFrame, hips: Bool = true, hands: Bool = true) -> PoseFrame {
+    var frame = frame
+    let gone = PosePoint(x: 0, y: 0, confidence: 0)
+    frame.leftKnee = gone
+    frame.rightKnee = gone
+    frame.leftAnkle = gone
+    frame.rightAnkle = gone
+    if !hips {
+        frame.leftHip = gone
+        frame.rightHip = gone
+    }
+    if !hands {
+        frame.leftWrist = gone
+        frame.rightWrist = gone
+    }
+    return frame
+}
+
+@Suite struct PartialBodyTests {
+    @Test func countsJumpingJacksWithoutLegsOrHands() {
+        var counter = JumpingJackCounter()
+        #expect(counter.ingest(cropped(pose(0), hips: false)) == .tracking)
+        #expect(counter.ingest(cropped(pose(0.4, wristY: 0.9), hips: false)) == .tracking)
+        #expect(counter.ingest(cropped(pose(0.8), hips: false)) == .repCompleted)
+        // Hands cropped out of the frame: the elbows carry the count.
+        var elbows = JumpingJackCounter()
+        _ = elbows.ingest(cropped(pose(0), hands: false))
+        _ = elbows.ingest(cropped(pose(0.4, elbowY: 0.8), hands: false))
+        #expect(elbows.ingest(cropped(pose(0.8), hands: false)) == .repCompleted)
+    }
+
+    @Test func countsSquatsWithoutLegs() {
+        var counter = SquatCounter()
+        _ = counter.ingest(cropped(pose(0), hips: false))
+        _ = counter.ingest(cropped(pose(1, hipY: 0.36), hips: false))
+        #expect(counter.ingest(cropped(pose(2), hips: false)) == .repCompleted)
+    }
+
+    @Test func stretchesWorkFromTheUpperBody() {
+        var reach = StretchTracker(stretch: .overheadReach)
+        _ = reach.ingest(cropped(pose(0, wristY: 0.9)))
+        #expect(reach.ingest(cropped(pose(0.25, wristY: 0.9))).credited == 0.25)
+        // Legs out of frame: a quad stretch can't be checked, so staying in view counts.
+        var quad = StretchTracker(stretch: .quadLeft)
+        _ = quad.ingest(cropped(pose(0)))
+        #expect(quad.ingest(cropped(pose(0.25))).credited == 0.25)
+    }
+
+    @Test func framingGateAsksToStepBackThenLatchesReady() {
+        var gate = FramingGate()
+        #expect(gate.ingest(pose(0, confidence: 0.1)) == .noBody)
+        // Too close: shoulders fill the frame.
+        #expect(gate.ingest(pose(1, shoulderWidth: 0.4)) == .stepBack)
+        #expect(gate.ingest(cropped(pose(2), hips: false)) == .stepBack)
+        #expect(gate.ingest(cropped(pose(3))) == .holdStill)
+        #expect(gate.ingest(cropped(pose(4))) == .ready)
+        #expect(gate.ingest(pose(5, shoulderWidth: 0.4)) == .ready)
+        // Never traps the user: after a while it lets counting start anyway.
+        var stuck = FramingGate()
+        #expect(stuck.ingest(pose(0, shoulderWidth: 0.4)) == .stepBack)
+        #expect(stuck.ingest(pose(16, shoulderWidth: 0.4)) == .ready)
+    }
+}
+
+@Suite struct AlarmSoundTests {
+    @Test func volumeStartsSubtleAndSwells() {
+        let ramp = AlarmVolumeRamp(startVolume: 0.1, rampSeconds: 60)
+        #expect(ramp.volume(elapsed: 0, level: .normal) == 0.1)
+        #expect(ramp.volume(elapsed: 20, level: .normal) < 0.25)
+        #expect(ramp.volume(elapsed: 60, level: .normal) == 1)
+        #expect(ramp.volume(elapsed: 600, level: .normal) == 1)
+        #expect(ramp.volume(elapsed: 0, level: .escalated) == 1)
+        #expect(ramp.volume(elapsed: 30, level: .off) == 0)
+    }
+
+    @Test func everySoundHasItsOwnFiles() {
+        #expect(Set(AlarmSound.allCases.map { $0.loopFile }).count == AlarmSound.allCases.count)
+        #expect(AlarmSound.dawnChimes.alarmFile == "dawn-chimes-alarm.wav")
     }
 }
 
@@ -236,8 +320,10 @@ private func pose(
 
         var engine = RoutineEngine(routine: routine)
         _ = engine.start(at: t0)
-        // Sit, then lights, then straight to the reps: no walking step.
-        #expect(routine.steps.prefix(3).map(\.id) == ["sit", "lights", "wake-reps"])
+        // Sit, lights, one set of reps, then straight into the stretches.
+        #expect(routine.steps.prefix(4).map { $0.id } == ["sit", "lights", "wake-reps", "stretch-armCircles"])
+        #expect(routine.steps.suffix(2).map { $0.id } == ["face", "water"])
+        #expect(routine.steps.count == 13)
         _ = engine.tick(at: t0 + 10)
         let afterLights = engine.handle(.confirmed, at: t0 + 40)
         #expect(afterLights == [.stepFinished(index: 1), .stepBegan(index: 2), .alarmSound(.normal)])
@@ -254,12 +340,14 @@ private func pose(
         #expect(lastRep == [.stepFinished(index: 2), .stepBegan(index: 3), .alarmSound(.off)])
     }
 
-    @Test func mainJumpingJackSetIsHalvedWhenJacksAlreadyStoppedTheAlarm() {
-        func mainSet(_ wake: Exercise) -> StepGoal? {
-            Routine.researchedDefault(wakeExercise: wake).steps.first { $0.id == "jumping-jacks" }?.goal
+    @Test func thereIsOnlyOneSetOfReps() {
+        for wake in Exercise.allCases {
+            let reps = Routine.researchedDefault(wakeExercise: wake).steps.filter {
+                if case .reps = $0.goal { return true }
+                return false
+            }
+            #expect(reps.map { $0.id } == ["wake-reps"])
         }
-        #expect(mainSet(.jumpingJack) == .reps(exercise: .jumpingJack, count: 20))
-        #expect(mainSet(.squat) == .reps(exercise: .jumpingJack, count: 40))
     }
 
     @Test func exerciseRotatesDayToDay() {
