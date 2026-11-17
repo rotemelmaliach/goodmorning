@@ -24,7 +24,7 @@
   .tokens { display: flex; flex-wrap: wrap; gap: 8px; padding: 14px 24px; align-items: center; }
   .tokens label { display: flex; align-items: center; gap: 6px; background: #3a2d26; padding: 5px 9px 5px 5px; border-radius: 999px; font-size: 12px; }
   .tokens input { width: 26px; height: 26px; border: 0; padding: 0; background: none; border-radius: 50%; cursor: pointer; }
-  .tokens button, .lab-btn { background: #f6ebe1; color: #2b211c; border: 0; border-radius: 999px; padding: 8px 14px; font: inherit; font-weight: 600; cursor: pointer; }
+  .tokens button, .lab-btn { margin-left: 4px; background: #f6ebe1; color: #2b211c; border: 0; border-radius: 999px; padding: 8px 14px; font: inherit; font-weight: 600; cursor: pointer; }
   #export { margin: 0 24px; padding: 12px; background: #1f1814; border-radius: 12px; font: 12px/1.5 ui-monospace, Consolas, monospace; white-space: pre-wrap; display: none; }
   .shelf { display: flex; gap: 28px; padding: 20px 24px 40px; overflow-x: auto; align-items: flex-start; }
   figure { margin: 0; flex: none; }
@@ -204,12 +204,12 @@
   </figure>
 
   <figure>
-    <figcaption>4–11 · Stretches<small>alarm off, seconds count while the pose is held</small></figcaption>
+    <figcaption>4–11 · Stretches <button class="lab-btn" id="prevStretch" aria-label="Previous stretch">‹</button> <button class="lab-btn" id="nextStretch" aria-label="Next stretch">›</button><small id="stretchNote">all eight, in order · use the arrows</small></figcaption>
     <div class="phone"><div class="col">
-      <div class="bar" data-step="4"></div><div class="meta"><span>Step 5 of 13</span><span class="belloff">🔕 Alarm off</span></div>
-      <h2>Overhead reach</h2><div class="soft center">Hands together, reach up and rise onto your toes.</div>
+      <div class="bar" id="stretchBar" data-step="3"></div><div class="meta"><span id="stretchStep">Step 4 of 13</span><span class="belloff">🔕 Alarm off</span></div>
+      <h2 id="stretchTitle">Arm circles</h2><div class="soft center" id="stretchText" style="min-height:3em"></div>
       <div class="cam">
-        <svg class="body" viewBox="0 0 300 400"><g transform="translate(150 225)"><circle class="person" cx="0" cy="-70" r="24"/><rect class="person" x="-36" y="-44" width="72" height="130" rx="24"/><path class="stick" d="M0-44V40M-30-40H30M-30-40L-22-100L-4-150M30-40L22-100L4-150M0 40L-16 44M0 40L16 44M-16 44L-18 130M16 44L18 130"/><circle class="stick" cx="0" cy="-70" r="18"/></g></svg>
+        <svg class="body" viewBox="0 0 300 400"><g transform="translate(150 225)"><circle class="person" cx="0" cy="-70" r="24"/><rect class="person" x="-36" y="-44" width="72" height="130" rx="24"/><path class="stick" id="stretchStick" d=""/><circle class="stick" cx="0" cy="-70" r="18"/></g></svg>
         <div class="count"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="45"/><circle class="p" cx="50" cy="50" r="45" stroke-dasharray="283" stroke-dashoffset="170"/></svg><span>9s</span></div>
       </div>
     </div></div>
@@ -303,6 +303,35 @@ drawSounds();
 
 // ---- Step bars -----------------------------------------------------------
 $$(".bar").forEach(bar => { const now = +bar.dataset.step; for (let i = 0; i < 13; i++) { const s = document.createElement("i"); s.className = i < now ? "done" : i === now ? "now" : ""; bar.append(s); } });
+
+// ---- Stretch sequence: same order and wording as Stretch.swift -------------
+const TRUNK = "M0-44V40M-30-40H30", LEGS = "M0 40L-16 44M0 40L16 44M-16 44L-18 130M16 44L18 130";
+const flip = d => d.replace(/([ML])(-?[\d.]+)/g, (m, c, x) => c + (-x));   // mirror a path left/right
+const bendArms = "M30-40L26-100L-10-140M-30-40L-42 0L-44 36";
+const quadArms = "M-30-40L-40 0L-30 40M30-40L60-20L88-10", quadLegs = "M0 40L-16 44M0 40L16 44M-16 44L-20 100L-34 60M16 44L18 130";
+const STRETCHES = [
+  ["Arm circles", "Big circles with straight arms, forward then backward.", "M-30-40L-62-70L-92-104M30-40L62-70L92-104", LEGS],
+  ["Overhead reach", "Hands together, reach up and rise onto your toes.", "M-30-40L-22-100L-4-150M30-40L22-100L4-150", LEGS],
+  ["Side bend, left", "Right arm overhead, lean to the left.", bendArms, LEGS],
+  ["Side bend, right", "Left arm overhead, lean to the right.", flip(bendArms), LEGS],
+  ["Cactus arms", "Elbows out at shoulder height, forearms up, squeeze your shoulder blades.", "M-30-40L-70-40L-70-85M30-40L70-40L70-85", LEGS],
+  ["Slow trunk twists", "Arms bent at chest height, rotate slowly side to side, hips facing forward.", "M-30-40L-50-10L-20-20M30-40L50-10L20-20", LEGS],
+  ["Quad stretch, left leg", "Pull your left heel toward your buttock. Hold a wall if you need to.", quadArms, quadLegs],
+  ["Quad stretch, right leg", "Pull your right heel toward your buttock. Hold a wall if you need to.", flip(quadArms), flip(quadLegs)],
+];
+let stretch = 0;
+function drawStretch() {
+  const [title, text, arms, legs] = STRETCHES[stretch];
+  $("#stretchTitle").textContent = title;
+  $("#stretchText").textContent = text;
+  $("#stretchStick").setAttribute("d", TRUNK + arms + legs);
+  $("#stretchStep").textContent = `Step ${stretch + 4} of 13`;
+  $("#stretchNote").textContent = `stretch ${stretch + 1} of 8 · 15 s each · use the arrows`;
+  $$("#stretchBar i").forEach((seg, i) => seg.className = i < stretch + 3 ? "done" : i === stretch + 3 ? "now" : "");
+}
+$("#prevStretch").onclick = () => { stretch = (stretch + 7) % 8; drawStretch(); };
+$("#nextStretch").onclick = () => { stretch = (stretch + 1) % 8; drawStretch(); };
+drawStretch();
 
 // ---- Live demos ----------------------------------------------------------
 let sit = 10;
