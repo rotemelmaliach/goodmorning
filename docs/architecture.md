@@ -12,11 +12,11 @@ make it stay quiet is to complete a verified wake-up sequence.
 | Strictness | Hard mode: no snooze, no skip. |
 | Schedule | A wake time per weekday (default 07:30 Sun to Thu, 09:00 Fri and Sat; edited in a weekly calendar on the home screen, any day can be turned off). |
 | Emergency exit | A day can be excused in advance only: at least 6 hours before its alarm. |
-| Never-ending alarm | The in-app alarm rings from the first step until the front camera has counted 20 reps of the day's exercise (jumping jacks, squats, or rotating daily). No fallback: nothing else silences it. |
+| Never-ending alarm | The in-app alarm rings from the first step until the front camera has counted 20 reps of the day's exercise (jumping jacks, squats, push-ups, or rotating daily). No fallback: nothing else silences it. |
 | Routine | From `docs/wake-protocol.md`: sit 10 s, lights, one set of 20 reps to stop the alarm, then straight into eight standing stretches (15 s each, camera-checked), face splash, water. |
 | Alarm sound | Five calming sounds synthesized by `tools/make_sounds.py` (chimes, singing bowl, ocean, harp, birds). The system alarm plays a file with a 20 s fade-in baked in; the in-app alarm ramps from 8% to full over 75 s (`AlarmVolumeRamp`) and jumps to full when a step runs over time. The phone's own volume setting still caps it. |
-| Camera framing | The phone can't see the whole body. The user is asked to step back once (`FramingGate`: head to hips in view), then everything is counted from shoulders and arms: jumping jacks by arms down/up/down, squats by how far the shoulders sink. A white stick figure is drawn over the selfie preview. |
-| Look | Warm dawn palette (cream, peach, terracotta, sage) in `Theme.swift`, mirrored in the browser UI lab at `docs/ui-lab/index.html`. |
+| Camera framing | The phone can't see the whole body. The user is asked to step back once (`FramingGate`: head to hips in view), then everything is counted from shoulders and arms: jumping jacks by arms down/up/down, squats by how far the shoulders sink. Push-ups use the same shoulder-drop counter with the phone on the floor (no step back; measured in upper-arm lengths so side-on works). A white stick figure is drawn over the selfie preview. |
+| Look | Warm dawn palette (cream, peach, terracotta, sage) in `Theme.swift`, mirrored in the browser UI lab at `docs/ui-lab/index.html`. Motion follows the `emil-design-eng` skill in `.agents/skills`: presses shrink to 0.97 over 150 ms, one strong ease-out curve, UI under 300 ms, no bounce except the completion screen, staggered entrances, Reduce Motion respected. |
 | After the routine | Summary screen with sleep stats, weather and today's calendar. |
 | Verification | Phone pedometer, front camera body pose, Apple Watch heart rate |
 | Build | No Mac. GitHub Actions macOS runner builds; XcodeGen generates the Xcode project from `project.yml`. |

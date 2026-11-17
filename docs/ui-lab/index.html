@@ -13,6 +13,8 @@
     --dawnTop: #FFE2C6; --glowStart: #F2B184; --glowMid: #D9805C;
     --glow: linear-gradient(135deg, var(--glowStart), var(--glowMid), var(--terracotta));
     --dawn: linear-gradient(180deg, var(--dawnTop), var(--canvas) 38%);
+    /* Motion tokens, same as Theme.easeOut / Theme.pressScale. */
+    --ease-out: cubic-bezier(0.23, 1, 0.32, 1); --press: 0.97;
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: #2b211c; color: #f6ebe1; font: 15px/1.45 ui-rounded, "SF Pro Rounded", "Segoe UI", system-ui, sans-serif; }
@@ -45,21 +47,26 @@
   .card h3 { margin: 0 0 12px; font-size: 16px; }
   .card h3 i { color: var(--terracotta); font-style: normal; margin-right: 6px; }
 
-  button.tap { font: inherit; color: inherit; border: 0; cursor: pointer; transition: transform .18s cubic-bezier(.3,1.6,.5,1), opacity .15s; }
-  button.tap:active { transform: scale(.94); opacity: .85; }
+  button.tap { font: inherit; color: inherit; border: 0; cursor: pointer; transition: transform 150ms var(--ease-out), opacity 150ms var(--ease-out), background-color 200ms ease; }
+  button.tap:active { transform: scale(var(--press)); opacity: .9; }
+  .scroll > * { animation: enter 300ms var(--ease-out) backwards; }
+  .scroll > :nth-child(2) { animation-delay: 50ms; } .scroll > :nth-child(3) { animation-delay: 90ms; }
+  .scroll > :nth-child(4) { animation-delay: 120ms; } .scroll > :nth-child(n+5) { animation-delay: 145ms; }
+  @keyframes enter { from { opacity: 0; transform: translateY(8px); } }
+  @media (prefers-reduced-motion: reduce) { .scroll > *, .sunicon { animation-name: fade; } @keyframes fade { from { opacity: 0; } } }
   .week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
   .day { background: color-mix(in srgb, var(--peach) 45%, transparent); border-radius: 13px; padding: 9px 0; display: grid; gap: 3px; font-size: 11px; }
   .day b { font-size: 12px; } .day.off { background: color-mix(in srgb, var(--line) 60%, transparent); color: var(--inkSoft); }
-  .day.sel { background: var(--glow); color: #fff; transform: scale(1.06); }
+  .day.sel { background: var(--glow); color: #fff; transform: scale(1.04); }
   .editor { background: var(--canvas); border-radius: 17px; padding: 12px; margin-top: 14px; display: grid; gap: 10px; }
   .editor .row { display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
   .switch { width: 48px; height: 29px; border-radius: 999px; background: var(--line); position: relative; }
-  .switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 23px; height: 23px; border-radius: 50%; background: #fff; transition: left .2s; box-shadow: 0 1px 3px #0003; }
-  .switch.on { background: var(--sage); } .switch.on::after { left: 22px; }
+  .switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 23px; height: 23px; border-radius: 50%; background: #fff; transition: transform 200ms var(--ease-out); box-shadow: 0 1px 3px #0003; }
+  .switch.on { background: var(--sage); } .switch.on::after { transform: translateX(19px); }
   .softbtn { background: color-mix(in srgb, var(--peach) 42%, transparent); color: var(--clay) !important; font-weight: 600 !important; font-size: 13px !important; padding: 9px 14px; border-radius: 999px; }
   .timebox { background: var(--line); border-radius: 9px; padding: 6px 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
-  .choices { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; margin-bottom: 10px; }
-  .choice { background: color-mix(in srgb, var(--peach) 35%, transparent); border-radius: 17px; min-height: 82px; display: grid; place-content: center; gap: 6px; font-size: 12px; font-weight: 600; }
+  .choices { display: grid; grid-template-columns: repeat(2, 1fr); gap: 9px; margin-bottom: 10px; }
+  .choice { background: color-mix(in srgb, var(--peach) 35%, transparent); border-radius: 17px; min-height: 74px; display: grid; place-content: center; gap: 6px; font-size: 12px; font-weight: 600; }
   .choice span { font-size: 24px; } .choice.sel { background: var(--glow); color: #fff; }
   .sound { display: flex; align-items: center; gap: 11px; padding: 9px; border-radius: 15px; background: var(--canvas); margin-bottom: 7px; }
   .sound.sel { background: color-mix(in srgb, var(--sageSoft) 60%, transparent); }
@@ -83,7 +90,7 @@
   .ring { width: 240px; height: 240px; position: relative; display: grid; place-items: center; }
   .ring svg { position: absolute; inset: 0; transform: rotate(-90deg); }
   .ring circle { fill: none; stroke-width: 14; stroke: var(--line); }
-  .ring circle.p { stroke: var(--terracotta); stroke-linecap: round; transition: stroke-dashoffset .5s; }
+  .ring circle.p { stroke: var(--terracotta); stroke-linecap: round; transition: stroke-dashoffset 1s linear; }
   .ring .n { font-size: 80px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
   .icon { width: 176px; height: 176px; border-radius: 50%; background: color-mix(in srgb, var(--peach) 45%, transparent); display: grid; place-items: center; font-size: 78px; }
   .cam { flex: 1; border-radius: 28px; position: relative; overflow: hidden; border: 4px solid var(--sage); background: radial-gradient(120% 90% at 50% 20%, #8d7b6f, #54463e 60%, #3b302b); box-shadow: 0 8px 18px color-mix(in srgb, var(--clay) 18%, transparent); }
@@ -94,9 +101,9 @@
   .hint { position: absolute; top: 13px; left: 50%; transform: translateX(-50%); white-space: nowrap; background: color-mix(in srgb, var(--card) 94%, transparent); padding: 8px 14px; border-radius: 999px; font-weight: 600; font-size: 14px; }
   .count { position: absolute; right: 13px; bottom: 13px; width: 100px; height: 100px; border-radius: 50%; background: #0006; display: grid; place-items: center; color: #fff; font-size: 30px; font-weight: 700; }
   .count svg { position: absolute; inset: 0; transform: rotate(-90deg); }
-  .count circle { fill: none; stroke-width: 9; stroke: #fff3; } .count circle.p { stroke: var(--sun); stroke-linecap: round; transition: stroke-dashoffset .3s; }
-  .sunicon { font-size: 96px; animation: rise 1s cubic-bezier(.3,1.5,.5,1); }
-  @keyframes rise { from { transform: scale(.5) rotate(-40deg); } }
+  .count circle { fill: none; stroke-width: 9; stroke: #fff3; } .count circle.p { stroke: var(--sun); stroke-linecap: round; transition: stroke-dashoffset 250ms linear; }
+  .sunicon { font-size: 96px; animation: rise 500ms var(--ease-out); }
+  @keyframes rise { from { transform: scale(.9); opacity: 0; } }
   .streak { background: color-mix(in srgb, var(--peach) 50%, transparent); color: var(--clay); font-weight: 600; padding: 9px 16px; border-radius: 999px; }
 </style>
 </head>
@@ -130,9 +137,10 @@
       </div>
       <div class="card"><h3><i>◈</i>Stops the alarm</h3>
         <div class="choices" id="choices">
-          <button class="tap choice sel"><span>🔁</span>Rotate</button>
+          <button class="tap choice sel"><span>🔁</span>Rotate daily</button>
           <button class="tap choice"><span>🤸</span>Jumping jacks</button>
           <button class="tap choice"><span>🏋️</span>Squats</button>
+          <button class="tap choice"><span>💪</span>Push-ups</button>
         </div>
         <div class="soft cap">One set of 20 reps, counted by the camera. The alarm keeps going until the last one. There is no other way to stop it.</div>
       </div>

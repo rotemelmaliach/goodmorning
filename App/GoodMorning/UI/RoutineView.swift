@@ -5,6 +5,7 @@ import SwiftUI
 /// Full-screen view for the running routine. There is intentionally no close button.
 struct RoutineView: View {
     @Environment(RoutineSession.self) private var session
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         ZStack {
@@ -24,7 +25,11 @@ struct RoutineView: View {
                             .multilineTextAlignment(.center)
                     }
                     .id(step.id)
-                    .transition(.opacity.combined(with: .move(edge: .trailing)))
+                    // The next step slides in a short way; the old one just fades, faster.
+                    .transition(.asymmetric(
+                        insertion: .opacity.combined(with: .offset(x: reduceMotion ? 0 : 24)),
+                        removal: .opacity
+                    ))
 
                     if let camera = session.camera {
                         cameraCard(camera, engine: engine, step: step)
@@ -36,7 +41,7 @@ struct RoutineView: View {
                 }
                 .padding(.horizontal, 20)
                 .padding(.bottom, 16)
-                .animation(.easeInOut(duration: 0.3), value: step.id)
+                .animation(Theme.easeOut(0.25), value: step.id)
             }
         }
         .interactiveDismissDisabled()
@@ -54,6 +59,7 @@ struct RoutineView: View {
                     Capsule()
                         .fill(i < index ? Theme.sage : (i == index ? Theme.terracotta : Theme.line))
                         .frame(height: 6)
+                        .animation(Theme.easeOut(0.25), value: index)
                 }
             }
             HStack {
@@ -99,7 +105,7 @@ struct RoutineView: View {
                     .padding(.vertical, 9)
                     .background(Theme.card.opacity(0.94), in: Capsule())
                     .padding(14)
-                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .top)))
             }
         }
         .overlay(alignment: .bottomTrailing) {
@@ -109,7 +115,7 @@ struct RoutineView: View {
                     .monospacedDigit()
                     .foregroundStyle(.white)
                     .contentTransition(.numericText())
-                    .animation(.snappy, value: engine.count)
+                    .animation(Theme.easeOut(), value: engine.count)
             }
             .frame(width: 104, height: 104)
             .background(.black.opacity(0.35), in: Circle())
@@ -120,7 +126,7 @@ struct RoutineView: View {
                 .strokeBorder(camera.guidance == .tracking ? Theme.sage : Theme.peach, lineWidth: 4)
         }
         .shadow(color: Theme.clay.opacity(0.18), radius: 16, y: 8)
-        .animation(.easeInOut(duration: 0.25), value: camera.guidance)
+        .animation(Theme.easeOut(0.2), value: camera.guidance)
         .sensoryFeedback(.impact(weight: .medium), trigger: engine.count)
     }
 
@@ -129,7 +135,7 @@ struct RoutineView: View {
         case .searching: ("Stand where the camera can see you", "person.fill.viewfinder")
         case .stepBack: ("Take a few steps back", "arrow.up.backward.and.arrow.down.forward")
         case .holdStill: ("Perfect. Starting…", "checkmark.circle.fill")
-        case .outOfView: ("Keep your shoulders and arms in view", "person.fill.viewfinder")
+        case .outOfView: ("Come back into view", "person.fill.viewfinder")
         case .tracking: nil
         }
     }
@@ -248,6 +254,7 @@ struct CompletionView: View {
     let onDone: () -> Void
 
     @State private var appeared = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         ZStack {
@@ -257,11 +264,13 @@ struct CompletionView: View {
                 Image(systemName: "sun.max.fill")
                     .font(.system(size: 96))
                     .foregroundStyle(Theme.apricot)
-                    .scaleEffect(appeared ? 1 : 0.5)
-                    .rotationEffect(.degrees(appeared ? 0 : -40))
+                    // Never from nothing: the sun starts nearly full size and fades up.
+                    .scaleEffect(appeared || reduceMotion ? 1 : 0.9)
+                    .opacity(appeared ? 1 : 0)
                 Text("You're up.")
                     .font(Theme.title(44))
                     .foregroundStyle(Theme.ink)
+                    .entrance(1)
                 Text("Routine done in \(Duration.seconds(summary.totalDuration).formatted(.time(pattern: .minuteSecond))).")
                     .font(Theme.body)
                     .foregroundStyle(Theme.inkSoft)
@@ -271,14 +280,17 @@ struct CompletionView: View {
                     .padding(.horizontal, 16)
                     .padding(.vertical, 10)
                     .background(Theme.peach.opacity(0.5), in: Capsule())
+                    .entrance(3)
                 Spacer()
                 Button("Start the day", action: onDone)
                     .buttonStyle(PrimaryButtonStyle())
+                    .entrance(4)
             }
             .padding(24)
         }
         .onAppear {
-            withAnimation(.spring(response: 0.7, dampingFraction: 0.55)) { appeared = true }
+            // Seen once a day, so this one moment is allowed a little bounce.
+            withAnimation(.spring(duration: 0.5, bounce: 0.2)) { appeared = true }
         }
         .sensoryFeedback(.success, trigger: appeared)
     }

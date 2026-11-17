@@ -121,8 +121,12 @@ final class RoutineSession {
             sensor = camera
             return
         }
-        let camera = PoseCameraSensor(mode: mode, requireFraming: !framedThisRoutine)
-        framedThisRoutine = true
+        // Push-ups happen close to the phone on the floor, so they don't ask for a step back;
+        // the first standing camera step after them does.
+        var needsStepBack = true
+        if case .reps(let exercise) = mode { needsStepBack = exercise.needsStepBack }
+        let camera = PoseCameraSensor(mode: mode, requireFraming: needsStepBack && !framedThisRoutine)
+        if needsStepBack { framedThisRoutine = true }
         self.camera = camera
         sensor = camera
         camera.start { [weak self] event in self?.send(event) }

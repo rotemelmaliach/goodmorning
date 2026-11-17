@@ -15,14 +15,15 @@ struct HomeView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 18) {
-                hero
+                hero.entrance(0)
                 Card("Your week", icon: "calendar") {
                     WeekCalendarView(schedule: $schedule)
                 }
-                exerciseCard
-                soundCard
-                skipCard
-                progressCard
+                .entrance(1)
+                exerciseCard.entrance(2)
+                soundCard.entrance(3)
+                skipCard.entrance(4)
+                progressCard.entrance(5)
                 Button {
                     preview.stop()
                     session.begin()
@@ -31,6 +32,7 @@ struct HomeView: View {
                 }
                 .buttonStyle(PrimaryButtonStyle())
                 .padding(.top, 6)
+                .entrance(6)
             }
             .padding(.horizontal, 18)
             .padding(.bottom, 32)
@@ -108,10 +110,11 @@ struct HomeView: View {
 
     private var exerciseCard: some View {
         Card("Stops the alarm", icon: "figure.mixed.cardio") {
-            HStack(spacing: 10) {
-                exerciseChoice(nil, title: "Rotate", icon: "arrow.triangle.2.circlepath")
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible())], spacing: 10) {
+                exerciseChoice(nil, title: "Rotate daily", icon: "arrow.triangle.2.circlepath")
                 exerciseChoice(.jumpingJack, title: "Jumping jacks", icon: "figure.mixed.cardio")
                 exerciseChoice(.squat, title: "Squats", icon: "figure.strengthtraining.functional")
+                exerciseChoice(.pushUp, title: "Push-ups", icon: "figure.core.training")
             }
             Text("One set of 20 reps, counted by the camera. The alarm keeps going until the last one. There is no other way to stop it.")
                 .font(Theme.caption)
@@ -122,7 +125,7 @@ struct HomeView: View {
     private func exerciseChoice(_ exercise: Exercise?, title: String, icon: String) -> some View {
         let isSelected = wakeExercise == exercise
         return Button {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) { wakeExercise = exercise }
+            withAnimation(Theme.easeOut()) { wakeExercise = exercise }
             Store.wakeExercise = exercise
         } label: {
             VStack(spacing: 8) {
@@ -133,7 +136,7 @@ struct HomeView: View {
                     .lineLimit(2)
                     .minimumScaleFactor(0.8)
             }
-            .frame(maxWidth: .infinity, minHeight: 84)
+            .frame(maxWidth: .infinity, minHeight: 76)
             .foregroundStyle(isSelected ? Color.white : Theme.ink)
             .background {
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -176,7 +179,7 @@ struct HomeView: View {
             .accessibilityLabel(isPlaying ? "Stop \(sound.title)" : "Play \(sound.title)")
 
             Button {
-                withAnimation(.snappy) { alarmSound = sound }
+                withAnimation(Theme.easeOut()) { alarmSound = sound }
                 Store.alarmSound = sound
                 Task { await session.rearmAlarms() }
             } label: {
@@ -213,7 +216,7 @@ struct HomeView: View {
                     .foregroundStyle(Theme.sage)
             } else {
                 Button("Skip tomorrow") {
-                    withAnimation(.snappy) { skipRefused = !schedule.skip(tomorrow, now: .now) }
+                    withAnimation(Theme.easeOut()) { skipRefused = !schedule.skip(tomorrow, now: .now) }
                 }
                 .buttonStyle(SoftButtonStyle())
             }

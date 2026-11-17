@@ -19,7 +19,7 @@ struct GoodMorningApp: App {
             .environment(session)
             .preferredColorScheme(.light)
             .tint(Theme.terracotta)
-            .animation(.easeInOut(duration: 0.35), value: session.isActive)
+            .animation(Theme.easeOut(0.3), value: session.isActive)
             .task {
                 WatchLink.shared.activate()
                 // Re-plan on every launch so the rolling window of alarms never runs dry.

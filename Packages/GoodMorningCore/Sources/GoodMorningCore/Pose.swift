@@ -160,6 +160,9 @@ public struct JumpingJackCounter: Sendable {
 
 /// Counts squats from how far the shoulders sink, so it works when the legs are out of frame.
 /// One rep = standing -> shoulders drop by most of a shoulder width -> standing again.
+///
+/// Push-ups are the same movement seen from the floor (shoulders sink toward the hands and
+/// come back up), so they use this counter with the `pushUp` settings.
 public struct SquatCounter: Sendable {
     public struct Config: Sendable {
         public var minConfidence = 0.3
@@ -170,8 +173,21 @@ public struct SquatCounter: Sendable {
         public var minRepSeconds = 0.6
         /// How quickly the standing height follows the user when they drift (seconds).
         public var baselineSeconds = 3.0
+        /// Measure the drop in upper-arm lengths when that is larger than the shoulder width.
+        /// Needed for push-ups seen from the side, where the shoulders overlap.
+        public var unitIncludesUpperArm = false
 
         public init() {}
+
+        /// Shoulders travel less in a push-up than in a squat, and the user may be side-on.
+        public static var pushUp: Config {
+            var config = Config()
+            config.downDrop = 0.45
+            config.upDrop = 0.18
+            config.minRepSeconds = 0.5
+            config.unitIncludesUpperArm = true
+            return config
+        }
     }
 
     public var config: Config
@@ -186,7 +202,7 @@ public struct SquatCounter: Sendable {
     }
 
     public mutating func ingest(_ frame: PoseFrame) -> RepResult {
-        guard frame.hasShoulders(config.minConfidence) else { return .bodyNotVisible }
+        guard let unit = unit(frame) else { return .bodyNotVisible }
         let elapsed = lastFrameTime.map { max(frame.time - $0, 0) } ?? 0
         lastFrameTime = frame.time
 
@@ -196,7 +212,7 @@ public struct SquatCounter: Sendable {
             return .tracking
         }
         if y > standing { standing = y }
-        let drop = (standing - y) / frame.shoulderWidth
+        let drop = (standing - y) / unit
 
         defer { standingY = standing }
         if drop >= config.downDrop {
@@ -218,11 +234,30 @@ public struct SquatCounter: Sendable {
     }
 }
 
+extension SquatCounter {
+    /// The length the drop is measured in, or nil when the shoulders can't be seen.
+    fileprivate func unit(_ frame: PoseFrame) -> Double? {
+        let min = config.minConfidence
+        guard frame.seen(frame.leftShoulder, frame.rightShoulder, minConfidence: min) else { return nil }
+        var unit = frame.shoulderWidth
+        if config.unitIncludesUpperArm {
+            func upperArm(_ shoulder: PosePoint, _ elbow: PosePoint) -> Double {
+                guard elbow.confidence >= min else { return 0 }
+                let dx = shoulder.x - elbow.x, dy = shoulder.y - elbow.y
+                return (dx * dx + dy * dy).squareRoot()
+            }
+            unit = max(unit, upperArm(frame.leftShoulder, frame.leftElbow), upperArm(frame.rightShoulder, frame.rightElbow))
+        }
+        return unit > 0.02 ? unit : nil
+    }
+}
+
 /// One counter for whichever exercise a step asks for.
 public struct RepCounter: Sendable {
     public let exercise: Exercise
     private var jacks = JumpingJackCounter()
     private var squats = SquatCounter()
+    private var pushUps = SquatCounter(config: .pushUp)
 
     public init(exercise: Exercise) {
         self.exercise = exercise
@@ -232,6 +267,7 @@ public struct RepCounter: Sendable {
         switch exercise {
         case .jumpingJack: jacks.ingest(frame)
         case .squat: squats.ingest(frame)
+        case .pushUp: pushUps.ingest(frame)
         }
     }
 }

@@ -209,6 +209,31 @@ private func cropped(_ frame: PoseFrame, hips: Bool = true, hands: Bool = true) 
         #expect(counter.ingest(cropped(pose(2), hips: false)) == .repCompleted)
     }
 
+    @Test func countsPushUpsFacingTheCameraAndSideOn() {
+        // Facing the phone: shoulders sink half a shoulder width and come back.
+        var facing = RepCounter(exercise: .pushUp)
+        _ = facing.ingest(cropped(pose(0), hips: false))
+        #expect(facing.ingest(cropped(pose(0.6, hipY: 0.45), hips: false)) == .tracking)
+        #expect(facing.ingest(cropped(pose(1.2), hips: false)) == .repCompleted)
+        // A small bob is not a push-up.
+        _ = facing.ingest(cropped(pose(2, hipY: 0.49), hips: false))
+        #expect(facing.ingest(cropped(pose(3), hips: false)) == .tracking)
+        // Side-on the shoulders overlap, so the upper arm is the yardstick.
+        var side = RepCounter(exercise: .pushUp)
+        _ = side.ingest(cropped(pose(0, shoulderWidth: 0.01), hips: false))
+        _ = side.ingest(cropped(pose(0.6, hipY: 0.43, shoulderWidth: 0.01), hips: false))
+        #expect(side.ingest(cropped(pose(1.2, shoulderWidth: 0.01), hips: false)) == .repCompleted)
+    }
+
+    @Test func pushUpsSkipTheStepBackAndGetTheirOwnSetup() {
+        #expect(!Exercise.pushUp.needsStepBack)
+        #expect(Exercise.squat.needsStepBack)
+        let step = Routine.researchedDefault(wakeExercise: .pushUp).steps.first { $0.id == "wake-reps" }
+        #expect(step?.goal == .reps(exercise: .pushUp, count: 20))
+        #expect(step?.instruction == Exercise.pushUp.setupInstruction)
+        #expect(step?.title == "20 push-ups to stop the alarm")
+    }
+
     @Test func stretchesWorkFromTheUpperBody() {
         var reach = StretchTracker(stretch: .overheadReach)
         _ = reach.ingest(cropped(pose(0, wristY: 0.9)))

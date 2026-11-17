@@ -32,6 +32,18 @@ enum Theme {
 
     static let corner: CGFloat = 24
 
+    // Motion. One strong ease-out curve everywhere; UI stays under 300 ms and nothing bounces
+    // except the once-a-day celebration. Presses shrink to 0.97: enough to feel, not to see.
+    static let pressScale: CGFloat = 0.97
+    static func easeOut(_ duration: Double = 0.2) -> Animation {
+        .timingCurve(0.23, 1, 0.32, 1, duration: duration)
+    }
+    /// For things that move across the screen rather than enter or leave.
+    static func easeInOut(_ duration: Double = 0.25) -> Animation {
+        .timingCurve(0.77, 0, 0.175, 1, duration: duration)
+    }
+    static let press = easeOut(0.15)
+
     static func title(_ size: CGFloat) -> Font { .system(size: size, weight: .bold, design: .rounded) }
     static let heading = Font.system(.headline, design: .rounded).weight(.semibold)
     static let body = Font.system(.body, design: .rounded)
@@ -83,9 +95,9 @@ struct Card<Content: View>: View {
 struct PressableStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .scaleEffect(configuration.isPressed ? 0.95 : 1)
-            .opacity(configuration.isPressed ? 0.85 : 1)
-            .animation(.spring(response: 0.25, dampingFraction: 0.6), value: configuration.isPressed)
+            .scaleEffect(configuration.isPressed ? Theme.pressScale : 1)
+            .opacity(configuration.isPressed ? 0.9 : 1)
+            .animation(Theme.press, value: configuration.isPressed)
             .sensoryFeedback(.impact(weight: .light), trigger: configuration.isPressed) { _, pressed in pressed }
     }
 }
@@ -100,8 +112,8 @@ struct PrimaryButtonStyle: ButtonStyle {
             .padding(.vertical, 18)
             .background(Theme.glow, in: Capsule())
             .shadow(color: Theme.terracotta.opacity(configuration.isPressed ? 0.15 : 0.35), radius: 12, y: 6)
-            .scaleEffect(configuration.isPressed ? 0.96 : 1)
-            .animation(.spring(response: 0.25, dampingFraction: 0.6), value: configuration.isPressed)
+            .scaleEffect(configuration.isPressed ? Theme.pressScale : 1)
+            .animation(Theme.press, value: configuration.isPressed)
             .sensoryFeedback(.impact(weight: .medium), trigger: configuration.isPressed) { _, pressed in pressed }
     }
 }
@@ -115,8 +127,8 @@ struct SoftButtonStyle: ButtonStyle {
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
             .background(Theme.peach.opacity(configuration.isPressed ? 0.7 : 0.4), in: Capsule())
-            .scaleEffect(configuration.isPressed ? 0.95 : 1)
-            .animation(.spring(response: 0.25, dampingFraction: 0.6), value: configuration.isPressed)
+            .scaleEffect(configuration.isPressed ? Theme.pressScale : 1)
+            .animation(Theme.press, value: configuration.isPressed)
             .sensoryFeedback(.impact(weight: .light), trigger: configuration.isPressed) { _, pressed in pressed }
     }
 }
@@ -135,8 +147,34 @@ struct ProgressRing<Label: View>: View {
                 .trim(from: 0, to: max(0.001, min(progress, 1)))
                 .stroke(tint, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
                 .rotationEffect(.degrees(-90))
-                .animation(.easeOut(duration: 0.4), value: progress)
+                // Progress is constant motion, so it moves linearly and briefly.
+                .animation(.linear(duration: 0.25), value: progress)
             label
         }
     }
+}
+
+/// Staggered entrance: each item fades up a few points, slightly after the one before it.
+/// Delays are short and uneven so the cascade reads as one movement. With Reduce Motion on,
+/// items only fade.
+struct Entrance: ViewModifier {
+    let index: Int
+    @State private var shown = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private static let delays: [Double] = [0, 0.05, 0.09, 0.12, 0.145, 0.165, 0.18]
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(shown ? 1 : 0)
+            .offset(y: shown || reduceMotion ? 0 : 8)
+            .onAppear {
+                let delay = Self.delays[min(index, Self.delays.count - 1)]
+                withAnimation(Theme.easeOut(0.3).delay(delay)) { shown = true }
+            }
+    }
+}
+
+extension View {
+    func entrance(_ index: Int) -> some View { modifier(Entrance(index: index)) }
 }

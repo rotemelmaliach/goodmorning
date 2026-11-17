@@ -3,13 +3,26 @@ import Foundation
 public enum Exercise: String, Codable, Sendable, CaseIterable {
     case jumpingJack
     case squat
+    case pushUp
 
     public var title: String {
         switch self {
         case .jumpingJack: "Jumping jacks"
         case .squat: "Squats"
+        case .pushUp: "Push-ups"
         }
     }
+
+    /// How to place the phone so the camera can count this exercise.
+    public var setupInstruction: String {
+        switch self {
+        case .jumpingJack, .squat: "Prop the phone up and take a few steps back. Head to hips in view is enough."
+        case .pushUp: "Lean the phone against something on the floor and face it. Keep your head and shoulders in view."
+        }
+    }
+
+    /// Standing exercises ask the user to step back first; push-ups happen close to the phone.
+    public var needsStepBack: Bool { self != .pushUp }
 
     /// A different exercise each day, so the alarm can't be silenced on autopilot.
     public static func rotating(on day: Date, calendar: Calendar = .current) -> Exercise {
@@ -102,7 +115,7 @@ public struct Routine: Codable, Sendable, Equatable {
             RoutineStep(
                 id: "wake-reps",
                 title: "\(wakeReps) \(wakeExercise.title.lowercased()) to stop the alarm",
-                instruction: "Prop the phone up and take a few steps back. Head to hips in view is enough.",
+                instruction: wakeExercise.setupInstruction,
                 goal: .reps(exercise: wakeExercise, count: wakeReps),
                 timeLimit: 120,
                 alarmSounding: true
