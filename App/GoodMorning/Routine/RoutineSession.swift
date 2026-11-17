@@ -99,15 +99,13 @@ final class RoutineSession {
         case .reps(let exercise, _):
             useCamera(.reps(exercise))
             return
-        case .stretch(let stretch, _):
-            useCamera(.stretch(stretch))
-            return
         case .walk:
             sensor = PedometerSensor()
         case .heartRate:
             sensor = WatchHeartRateSensor()
-        case .scanCode, .timer, .confirm:
-            sensor = nil  // scanCode: sensor not built yet; timer/confirm need none.
+        case .scanCode, .timer, .confirm, .stretch:
+            // scanCode: sensor not built yet. Stretches are guided by photos, not the camera.
+            sensor = nil
         }
         stopCamera()
         sensor?.start { [weak self] event in self?.send(event) }
@@ -121,8 +119,7 @@ final class RoutineSession {
             sensor = camera
             return
         }
-        // Push-ups happen close to the phone on the floor, so they don't ask for a step back;
-        // the first standing camera step after them does.
+        // Push-ups happen close to the phone on the floor, so they don't ask for a step back.
         var needsStepBack = true
         if case .reps(let exercise) = mode { needsStepBack = exercise.needsStepBack }
         let camera = PoseCameraSensor(mode: mode, requireFraming: needsStepBack && !framedThisRoutine)

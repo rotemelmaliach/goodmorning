@@ -41,7 +41,7 @@ public enum StepGoal: Codable, Sendable, Equatable {
     case heartRate(atLeastBPM: Double, holdSeconds: TimeInterval)
     /// Camera: scan a code stuck somewhere away from the bed (e.g. bathroom mirror).
     case scanCode(payload: String)
-    /// Front camera body pose: accumulate this much time actually doing the stretch.
+    /// Guided stretch: a demonstration is shown and the step moves on after this long.
     case stretch(Stretch, seconds: TimeInterval)
     /// Unverified wait (e.g. drink water).
     case timer(seconds: TimeInterval)
@@ -58,6 +58,8 @@ public struct RoutineStep: Codable, Sendable, Equatable, Identifiable {
     public var timeLimit: TimeInterval?
     /// Whether the alarm keeps ringing while this step is in progress.
     public var alarmSounding: Bool
+    /// Whether the user may tap Skip to move past this step.
+    public var skippable: Bool
 
     public init(
         id: String,
@@ -65,7 +67,8 @@ public struct RoutineStep: Codable, Sendable, Equatable, Identifiable {
         instruction: String,
         goal: StepGoal,
         timeLimit: TimeInterval? = nil,
-        alarmSounding: Bool = false
+        alarmSounding: Bool = false,
+        skippable: Bool = false
     ) {
         self.id = id
         self.title = title
@@ -73,6 +76,7 @@ public struct RoutineStep: Codable, Sendable, Equatable, Identifiable {
         self.goal = goal
         self.timeLimit = timeLimit
         self.alarmSounding = alarmSounding
+        self.skippable = skippable
     }
 }
 
@@ -89,12 +93,12 @@ public struct Routine: Codable, Sendable, Equatable {
     /// the alarm never stops on its own. It rings from the first step until the camera has counted
     /// `wakeReps` of `wakeExercise`. There is no fallback and no other way to silence it.
     ///
-    /// After that single set of reps the routine goes straight into the stretch sequence.
+    /// After that single set of reps the routine goes straight into the stretch sequence:
+    /// guided by photos, timed, not camera-checked, and each stretch can be skipped.
     /// Steps whose sensor isn't built yet (lights, sink anchor) use a tap for now.
     public static func researchedDefault(
         wakeExercise: Exercise,
-        wakeReps: Int = 20,
-        stretchSeconds: TimeInterval = 15
+        wakeReps: Int = 20
     ) -> Routine {
         var steps = [
             RoutineStep(
@@ -126,8 +130,8 @@ public struct Routine: Codable, Sendable, Equatable {
                 id: "stretch-\($0.rawValue)",
                 title: $0.title,
                 instruction: $0.instruction,
-                goal: .stretch($0, seconds: stretchSeconds),
-                timeLimit: stretchSeconds * 4
+                goal: .stretch($0, seconds: $0.seconds),
+                skippable: true
             )
         }
         steps += [

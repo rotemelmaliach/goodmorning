@@ -102,6 +102,15 @@
   .count { position: absolute; right: 13px; bottom: 13px; width: 100px; height: 100px; border-radius: 50%; background: #0006; display: grid; place-items: center; color: #fff; font-size: 30px; font-weight: 700; }
   .count svg { position: absolute; inset: 0; transform: rotate(-90deg); }
   .count circle { fill: none; stroke-width: 9; stroke: #fff3; } .count circle.p { stroke: var(--sun); stroke-linecap: round; transition: stroke-dashoffset 250ms linear; }
+  .photo { position: absolute; inset: 0; background-size: cover; background-position: center top; transition: opacity 250ms var(--ease-out); }
+  .photo.flip { transform: scaleX(-1); }
+  .stretch-top { position: relative; padding: 50px 18px 30px; display: grid; gap: 10px; background: linear-gradient(180deg, var(--canvas) 55%, transparent); }
+  .stretch-top .meta { margin-top: 0; }
+  .panel { position: absolute; left: 14px; right: 14px; bottom: 14px; background: color-mix(in srgb, var(--card) 95%, transparent); border-radius: 24px; padding: 16px; display: grid; gap: 10px; justify-items: center; text-align: center; box-shadow: 0 6px 16px color-mix(in srgb, var(--clay) 18%, transparent); }
+  .panel h2 { font-size: 24px; }
+  .side { background: var(--terracotta); color: #fff; font-weight: 700; font-size: 13px; padding: 5px 14px; border-radius: 999px; }
+  .track { width: 100%; height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+  .track i { display: block; height: 100%; width: 0; background: var(--sage); border-radius: 3px; }
   .sunicon { font-size: 96px; animation: rise 500ms var(--ease-out); }
   @keyframes rise { from { transform: scale(.9); opacity: 0; } }
   .streak { background: color-mix(in srgb, var(--peach) 50%, transparent); color: var(--clay); font-weight: 600; padding: 9px 16px; border-radius: 999px; }
@@ -162,7 +171,7 @@
   <figure>
     <figcaption>1 · Sit up<small>timer step, alarm ringing</small></figcaption>
     <div class="phone"><div class="col">
-      <div class="bar" data-step="0"></div><div class="meta"><span>Step 1 of 13</span><span class="bell">🔔 Alarm on</span></div>
+      <div class="bar" data-step="0"></div><div class="meta"><span>Step 1 of 12</span><span class="bell">🔔 Alarm on</span></div>
       <h2>Sit up</h2><div class="soft center">Feet on the floor. Stay seated for 10 seconds before you stand.</div>
       <div class="grow"><div class="ring"><svg viewBox="0 0 240 240"><circle cx="120" cy="120" r="113"/><circle class="p" id="sitRing" cx="120" cy="120" r="113" stroke-dasharray="710" stroke-dashoffset="710"/></svg><div class="center"><div class="n" id="sitN">10</div><div class="soft">seconds</div></div></div></div>
     </div></div>
@@ -171,7 +180,7 @@
   <figure>
     <figcaption>2 · Lights on<small>tap step (also face, water)</small></figcaption>
     <div class="phone"><div class="col">
-      <div class="bar" data-step="1"></div><div class="meta"><span>Step 2 of 13</span><span class="bell">🔔 Alarm on</span></div>
+      <div class="bar" data-step="1"></div><div class="meta"><span>Step 2 of 12</span><span class="bell">🔔 Alarm on</span></div>
       <h2>Lights on</h2><div class="soft center">Turn on the lights or open the curtains, then tap.</div>
       <div class="grow"><div class="icon">💡</div></div>
       <button class="tap primary">✓ Done</button>
@@ -181,7 +190,7 @@
   <figure>
     <figcaption>3 · Step back<small>first camera step, before counting</small></figcaption>
     <div class="phone"><div class="col">
-      <div class="bar" data-step="2"></div><div class="meta"><span>Step 3 of 13</span><span class="bell">🔔 Alarm on</span></div>
+      <div class="bar" data-step="2"></div><div class="meta"><span>Step 3 of 12</span><span class="bell">🔔 Alarm on</span></div>
       <h2>20 jumping jacks to stop the alarm</h2><div class="soft center">Prop the phone up and take a few steps back. Head to hips in view is enough.</div>
       <div class="cam warn">
         <svg class="body" viewBox="0 0 300 400"><g transform="translate(150 250) scale(1.9)"><circle class="person" cx="0" cy="-70" r="22"/><rect class="person" x="-34" y="-44" width="68" height="120" rx="22"/><path class="stick" d="M0-44V20M-30-40H30M-30-40L-44 10M30-40L44 10"/><circle class="stick" cx="0" cy="-70" r="18"/></g></svg>
@@ -194,7 +203,7 @@
   <figure>
     <figcaption>3 · Counting reps<small>stick figure follows the body · live demo</small></figcaption>
     <div class="phone"><div class="col">
-      <div class="bar" data-step="2"></div><div class="meta"><span>Step 3 of 13</span><span class="bell">🔔 Alarm on</span></div>
+      <div class="bar" data-step="2"></div><div class="meta"><span>Step 3 of 12</span><span class="bell">🔔 Alarm on</span></div>
       <h2>20 jumping jacks to stop the alarm</h2><div class="soft center">Prop the phone up and take a few steps back. Head to hips in view is enough.</div>
       <div class="cam">
         <svg class="body" viewBox="0 0 300 400"><g transform="translate(150 215)"><circle class="person" cx="0" cy="-70" r="24"/><rect class="person" x="-36" y="-44" width="72" height="130" rx="24"/><rect class="person" x="-34" y="70" width="28" height="130" rx="13"/><rect class="person" x="6" y="70" width="28" height="130" rx="13"/><path class="stick" id="jack" d=""/><circle class="stick" cx="0" cy="-70" r="18"/></g></svg>
@@ -204,15 +213,21 @@
   </figure>
 
   <figure>
-    <figcaption>4–11 · Stretches <button class="lab-btn" id="prevStretch" aria-label="Previous stretch">‹</button> <button class="lab-btn" id="nextStretch" aria-label="Next stretch">›</button><small id="stretchNote">all eight, in order · use the arrows</small></figcaption>
-    <div class="phone"><div class="col">
-      <div class="bar" id="stretchBar" data-step="3"></div><div class="meta"><span id="stretchStep">Step 4 of 13</span><span class="belloff">🔕 Alarm off</span></div>
-      <h2 id="stretchTitle">Arm circles</h2><div class="soft center" id="stretchText" style="min-height:3em"></div>
-      <div class="cam">
-        <svg class="body" viewBox="0 0 300 400"><g transform="translate(150 225)"><circle class="person" cx="0" cy="-70" r="24"/><rect class="person" x="-36" y="-44" width="72" height="130" rx="24"/><path class="stick" id="stretchStick" d=""/><circle class="stick" cx="0" cy="-70" r="18"/></g></svg>
-        <div class="count"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="45"/><circle class="p" cx="50" cy="50" r="45" stroke-dasharray="283" stroke-dashoffset="170"/></svg><span>9s</span></div>
+    <figcaption>4–10 · Stretches <button class="lab-btn" id="prevStretch" aria-label="Previous stretch">‹</button> <button class="lab-btn" id="nextStretch" aria-label="Next stretch">›</button><small id="stretchNote">all seven, in order · use the arrows</small></figcaption>
+    <div class="phone">
+      <div class="photo" id="stretchPhoto"></div>
+      <div class="stretch-top">
+        <div class="bar" id="stretchBar" data-step="3"></div>
+        <div class="meta"><span id="stretchStep">Step 4 of 12</span><span class="belloff">🔕 Alarm off</span></div>
       </div>
-    </div></div>
+      <div class="panel">
+        <span class="side" id="stretchSide"></span>
+        <h2 id="stretchTitle"></h2>
+        <div class="soft" id="stretchText"></div>
+        <div class="track"><i id="stretchFill"></i></div>
+        <button class="tap softbtn" id="skipStretch">⏭ Skip this stretch</button>
+      </div>
+    </div>
   </figure>
 
   <figure>
@@ -302,36 +317,41 @@ function drawSounds() {
 drawSounds();
 
 // ---- Step bars -----------------------------------------------------------
-$$(".bar").forEach(bar => { const now = +bar.dataset.step; for (let i = 0; i < 13; i++) { const s = document.createElement("i"); s.className = i < now ? "done" : i === now ? "now" : ""; bar.append(s); } });
+$$(".bar").forEach(bar => { const now = +bar.dataset.step; for (let i = 0; i < 12; i++) { const s = document.createElement("i"); s.className = i < now ? "done" : i === now ? "now" : ""; bar.append(s); } });
 
-// ---- Stretch sequence: same order and wording as Stretch.swift -------------
-const TRUNK = "M0-44V40M-30-40H30", LEGS = "M0 40L-16 44M0 40L16 44M-16 44L-18 130M16 44L18 130";
-const flip = d => d.replace(/([ML])(-?[\d.]+)/g, (m, c, x) => c + (-x));   // mirror a path left/right
-const bendArms = "M30-40L26-100L-10-140M-30-40L-42 0L-44 36";
-const quadArms = "M-30-40L-40 0L-30 40M30-40L60-20L88-10", quadLegs = "M0 40L-16 44M0 40L16 44M-16 44L-20 100L-34 60M16 44L18 130";
+// ---- Stretch sequence: same order, wording and photos as Stretch.swift ------
+// [title, instruction, seconds, phases: [label, photo, flipped]]
 const STRETCHES = [
-  ["Arm circles", "Big circles with straight arms, forward then backward.", "M-30-40L-62-70L-92-104M30-40L62-70L92-104", LEGS],
-  ["Overhead reach", "Hands together, reach up and rise onto your toes.", "M-30-40L-22-100L-4-150M30-40L22-100L4-150", LEGS],
-  ["Side bend, left", "Right arm overhead, lean to the left.", bendArms, LEGS],
-  ["Side bend, right", "Left arm overhead, lean to the right.", flip(bendArms), LEGS],
-  ["Cactus arms", "Elbows out at shoulder height, forearms up, squeeze your shoulder blades.", "M-30-40L-70-40L-70-85M30-40L70-40L70-85", LEGS],
-  ["Slow trunk twists", "Arms bent at chest height, rotate slowly side to side, hips facing forward.", "M-30-40L-50-10L-20-20M30-40L50-10L20-20", LEGS],
-  ["Quad stretch, left leg", "Pull your left heel toward your buttock. Hold a wall if you need to.", quadArms, quadLegs],
-  ["Quad stretch, right leg", "Pull your right heel toward your buttock. Hold a wall if you need to.", flip(quadArms), flip(quadLegs)],
+  ["Arm circles", "Big circles with straight arms, forward then backward.", 15, [[null, "stretch-arm-circles", false]]],
+  ["Overhead reach", "Hands together, reach up and rise onto your toes.", 15, [[null, "stretch-overhead-reach", false]]],
+  ["Side bends", "One arm overhead and lean away from it. Five seconds each side.", 10, [["Lean left", "stretch-side-bend", true], ["Lean right", "stretch-side-bend", false]]],
+  ["Cactus arms", "Upper arms straight out at shoulder height, forearms pointing up like a goalpost. Squeeze your shoulder blades together.", 15, [[null, "stretch-cactus-arms", false]]],
+  ["Slow trunk twists", "Arms bent at chest height, rotate slowly side to side, hips facing forward.", 15, [[null, "stretch-trunk-twists", false]]],
+  ["Quad stretch, left leg", "Pull your left heel toward your buttock. Hold a wall if you need to.", 15, [[null, "stretch-quad", false]]],
+  ["Quad stretch, right leg", "Pull your right heel toward your buttock. Hold a wall if you need to.", 15, [[null, "stretch-quad", true]]],
 ];
-let stretch = 0;
+let stretch = 0, stretchStart = performance.now();
 function drawStretch() {
-  const [title, text, arms, legs] = STRETCHES[stretch];
+  const [title, text, seconds, phases] = STRETCHES[stretch];
+  const progress = Math.min((performance.now() - stretchStart) / 1000 / seconds, 1);
+  if (progress >= 1) return goStretch(1);                       // moves on by itself, like the app
+  const [label, photo, flipped] = phases[Math.min(Math.floor(progress * phases.length), phases.length - 1)];
   $("#stretchTitle").textContent = title;
   $("#stretchText").textContent = text;
-  $("#stretchStick").setAttribute("d", TRUNK + arms + legs);
-  $("#stretchStep").textContent = `Step ${stretch + 4} of 13`;
-  $("#stretchNote").textContent = `stretch ${stretch + 1} of 8 · 15 s each · use the arrows`;
+  $("#stretchPhoto").style.backgroundImage = `url("../../App/GoodMorning/Assets.xcassets/${photo}.imageset/${photo}.jpg")`;
+  $("#stretchPhoto").classList.toggle("flip", flipped);
+  $("#stretchSide").textContent = label || "";
+  $("#stretchSide").style.display = label ? "" : "none";
+  $("#stretchFill").style.width = progress * 100 + "%";
+  $("#stretchStep").textContent = `Step ${stretch + 4} of 12`;
+  $("#stretchNote").textContent = `stretch ${stretch + 1} of 7 · ${seconds} s · arrows or Skip`;
   $$("#stretchBar i").forEach((seg, i) => seg.className = i < stretch + 3 ? "done" : i === stretch + 3 ? "now" : "");
 }
-$("#prevStretch").onclick = () => { stretch = (stretch + 7) % 8; drawStretch(); };
-$("#nextStretch").onclick = () => { stretch = (stretch + 1) % 8; drawStretch(); };
-drawStretch();
+function goStretch(by) { stretch = (stretch + by + 7) % 7; stretchStart = performance.now(); drawStretch(); }
+$("#prevStretch").onclick = () => goStretch(-1);
+$("#nextStretch").onclick = () => goStretch(1);
+$("#skipStretch").onclick = () => goStretch(1);
+setInterval(drawStretch, 250);
 
 // ---- Live demos ----------------------------------------------------------
 let sit = 10;

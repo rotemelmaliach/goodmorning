@@ -27,8 +27,7 @@ struct BodySkeleton: Equatable {
     ]
 }
 
-/// Front camera -> Vision body pose -> rep counter or stretch tracker. This is the only thing
-/// that can silence the alarm. Frames never leave the device and nothing is recorded.
+/// Front camera -> Vision body pose -> rep counter. Used only for the reps that silence the alarm. Frames never leave the device and nothing is recorded.
 ///
 /// One sensor stays alive across consecutive camera steps (`switchTo`) so the preview doesn't
 /// restart between stretches.
@@ -37,7 +36,6 @@ struct BodySkeleton: Equatable {
 final class PoseCameraSensor: NSObject, RoutineSensor {
     enum Mode {
         case reps(Exercise)
-        case stretch(Stretch)
     }
 
     /// What to tell the user about where they are standing.
@@ -126,7 +124,6 @@ private final class FrameProcessor: NSObject, AVCaptureVideoDataOutputSampleBuff
 
     private var mode: PoseCameraSensor.Mode
     private var repCounter: RepCounter?
-    private var stretchTracker: StretchTracker?
     private var gate: FramingGate?
     private let request = VNDetectHumanBodyPoseRequest()
     private let minConfidence: Float = 0.3
@@ -141,10 +138,8 @@ private final class FrameProcessor: NSObject, AVCaptureVideoDataOutputSampleBuff
     func setMode(_ mode: PoseCameraSensor.Mode) {
         self.mode = mode
         repCounter = nil
-        stretchTracker = nil
         switch mode {
         case .reps(let exercise): repCounter = RepCounter(exercise: exercise)
-        case .stretch(let stretch): stretchTracker = StretchTracker(stretch: stretch)
         }
     }
 
@@ -202,13 +197,6 @@ private final class FrameProcessor: NSObject, AVCaptureVideoDataOutputSampleBuff
             onResult?(
                 result == .bodyNotVisible ? .outOfView : .tracking,
                 result == .repCompleted ? .repCounted(exercise) : nil,
-                skeleton
-            )
-        case .stretch(let stretch):
-            guard let output = stretchTracker?.ingest(frame) else { return }
-            onResult?(
-                output.bodyVisible ? .tracking : .outOfView,
-                output.credited > 0 ? .stretchHeld(stretch, seconds: output.credited) : nil,
                 skeleton
             )
         }

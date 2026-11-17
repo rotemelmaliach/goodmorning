@@ -5,11 +5,11 @@ public enum RoutineEvent: Sendable, Equatable {
     /// Cumulative steps since the current routine step began.
     case stepsWalked(Int)
     case repCounted(Exercise)
-    /// Seconds of valid stretching seen since the last event.
-    case stretchHeld(Stretch, seconds: TimeInterval)
     case heartRate(bpm: Double)
     case codeScanned(String)
     case confirmed
+    /// The user tapped Skip. Only steps marked `skippable` react to it.
+    case skipped
 }
 
 public enum AlarmSoundLevel: String, Codable, Sendable {
@@ -28,6 +28,23 @@ public struct StepRecord: Codable, Sendable, Equatable {
     public var stepID: String
     public var duration: TimeInterval
     public var overTimeLimit: Bool
+    public var skipped: Bool
+
+    public init(stepID: String, duration: TimeInterval, overTimeLimit: Bool, skipped: Bool = false) {
+        self.stepID = stepID
+        self.duration = duration
+        self.overTimeLimit = overTimeLimit
+        self.skipped = skipped
+    }
+
+    // History saved before `skipped` existed has no such key.
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        stepID = try values.decode(String.self, forKey: .stepID)
+        duration = try values.decode(TimeInterval.self, forKey: .duration)
+        overTimeLimit = try values.decode(Bool.self, forKey: .overTimeLimit)
+        skipped = try values.decodeIfPresent(Bool.self, forKey: .skipped) ?? false
+    }
 }
 
 public struct RoutineSummary: Codable, Sendable, Equatable {
@@ -40,7 +57,8 @@ public struct RoutineSummary: Codable, Sendable, Equatable {
 
 /// The wake-up sequence as a state machine. It has no clock and no sensors of its own:
 /// the caller passes the time in and feeds it events, which keeps it testable anywhere.
-/// There is deliberately no skip or abort: hard mode means the only way out is through.
+/// There is no abort, and a step can only be skipped if the routine marks it `skippable`
+/// (the stretches, after the alarm is already off). Everything else must be completed.
 public struct RoutineEngine: Sendable {
     public enum Phase: Sendable, Equatable {
         case idle
@@ -59,7 +77,6 @@ public struct RoutineEngine: Sendable {
     private var stepStartedAt: Date?
     private var escalated = false
     private var heartRateHeldSince: Date?
-    private var stretchHeld: TimeInterval = 0
     private var records: [StepRecord] = []
 
     public init(routine: Routine) {
@@ -81,6 +98,10 @@ public struct RoutineEngine: Sendable {
         guard case .running(let index) = phase else { return [] }
         var done = false
 
+        if event == .skipped {
+            return routine.steps[index].skippable ? finishStep(index, at: now, skipped: true) : []
+        }
+
         switch (routine.steps[index].goal, event) {
         case (.walk(let target), .stepsWalked(let total)):
             count = max(count, total)
@@ -90,10 +111,6 @@ public struct RoutineEngine: Sendable {
             count += 1
             progress = fraction(count, of: target)
             done = count >= target
-        case (.stretch(let stretch, let target), .stretchHeld(let held, let seconds)) where held == stretch:
-            stretchHeld += seconds
-            progress = target > 0 ? min(1, stretchHeld / target) : 1
-            done = stretchHeld >= target
         case (.heartRate(let threshold, let hold), .heartRate(let bpm)):
             if bpm >= threshold {
                 heartRateHeldSince = heartRateHeldSince ?? now
@@ -119,7 +136,7 @@ public struct RoutineEngine: Sendable {
         let elapsed = now.timeIntervalSince(began)
 
         switch step.goal {
-        case .timer(let seconds):
+        case .timer(let seconds), .stretch(_, let seconds):
             progress = seconds > 0 ? min(1, elapsed / seconds) : 1
             if elapsed >= seconds { return finishStep(index, at: now) }
         case .heartRate(_, let hold):
@@ -149,19 +166,19 @@ public struct RoutineEngine: Sendable {
         count = 0
         escalated = false
         heartRateHeldSince = nil
-        stretchHeld = 0
         return [
             .stepBegan(index: index),
             .alarmSound(routine.steps[index].alarmSounding ? .normal : .off),
         ]
     }
 
-    private mutating func finishStep(_ index: Int, at now: Date) -> [RoutineEffect] {
+    private mutating func finishStep(_ index: Int, at now: Date, skipped: Bool = false) -> [RoutineEffect] {
         records.append(
             StepRecord(
                 stepID: routine.steps[index].id,
                 duration: now.timeIntervalSince(stepStartedAt ?? now),
-                overTimeLimit: escalated
+                overTimeLimit: escalated,
+                skipped: skipped
             )
         )
         return [.stepFinished(index: index)] + begin(index + 1, at: now)
