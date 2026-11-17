@@ -11,6 +11,9 @@ struct RoutineView: View {
         ZStack {
             Theme.dawn.ignoresSafeArea()
             if let engine = session.engine, let step = engine.currentStep, case .running(let index) = engine.phase {
+                if case .stretch(let stretch, _) = step.goal {
+                    stretchScreen(stretch, engine: engine, step: step, index: index)
+                } else {
                 VStack(spacing: 18) {
                     header(engine: engine, step: step, index: index)
 
@@ -42,6 +45,7 @@ struct RoutineView: View {
                 .padding(.horizontal, 20)
                 .padding(.bottom, 16)
                 .animation(Theme.easeOut(0.25), value: step.id)
+                }
             }
         }
         .interactiveDismissDisabled()
@@ -83,6 +87,84 @@ struct RoutineView: View {
             }
         }
         .padding(.top, 8)
+    }
+
+    // MARK: - Stretches
+
+    /// A stretch fills the screen with its demonstration photo. No camera and no countdown:
+    /// a thin bar shows the time passing and the step moves on by itself, or on Skip.
+    private func stretchScreen(_ stretch: Stretch, engine: RoutineEngine, step: RoutineStep, index: Int) -> some View {
+        let phase = stretch.phase(at: engine.progress)
+        return ZStack {
+            Color.clear
+                .overlay {
+                    Image(phase.image)
+                        .resizable()
+                        .scaledToFill()
+                        .scaleEffect(x: phase.mirrored ? -1 : 1, y: 1)
+                        .id("\(step.id)-\(phase.mirrored)")
+                        .transition(.opacity)
+                }
+                .clipped()
+                .ignoresSafeArea()
+                .accessibilityLabel("Demonstration of \(stretch.title)")
+
+            VStack(spacing: 0) {
+                header(engine: engine, step: step, index: index)
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 26)
+                    .background {
+                        LinearGradient(colors: [Theme.canvas, Theme.canvas.opacity(0)], startPoint: .center, endPoint: .bottom)
+                            .ignoresSafeArea()
+                    }
+                Spacer(minLength: 0)
+                VStack(spacing: 12) {
+                    if let label = phase.label {
+                        Text(label)
+                            .font(.system(.subheadline, design: .rounded).weight(.bold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 6)
+                            .background(Theme.terracotta, in: Capsule())
+                            .id(label)
+                            .transition(.opacity)
+                    }
+                    Text(step.title)
+                        .font(Theme.title(26))
+                        .foregroundStyle(Theme.ink)
+                        .multilineTextAlignment(.center)
+                    Text(step.instruction)
+                        .font(Theme.body)
+                        .foregroundStyle(Theme.inkSoft)
+                        .multilineTextAlignment(.center)
+                    GeometryReader { bar in
+                        Capsule().fill(Theme.line)
+                        Capsule()
+                            .fill(Theme.sage)
+                            .frame(width: bar.size.width * engine.progress)
+                            .animation(.linear(duration: 0.5), value: engine.progress)
+                    }
+                    .frame(height: 6)
+                    if step.skippable {
+                        Button {
+                            session.send(.skipped)
+                        } label: {
+                            Label("Skip this stretch", systemImage: "forward.fill")
+                        }
+                        .buttonStyle(SoftButtonStyle())
+                    }
+                }
+                .padding(18)
+                .frame(maxWidth: .infinity)
+                .background(Theme.card.opacity(0.95), in: RoundedRectangle(cornerRadius: Theme.corner, style: .continuous))
+                .shadow(color: Theme.clay.opacity(0.18), radius: 16, y: 6)
+                .padding(.horizontal, 14)
+                .padding(.bottom, 12)
+            }
+        }
+        .animation(Theme.easeOut(0.25), value: step.id)
+        .animation(Theme.easeOut(0.25), value: phase.mirrored)
+        .sensoryFeedback(.impact(weight: .medium), trigger: phase.label)
     }
 
     // MARK: - Camera steps
@@ -143,7 +225,6 @@ struct RoutineView: View {
     private func counterText(engine: RoutineEngine, step: RoutineStep) -> String {
         switch step.goal {
         case .reps(_, let target): "\(max(target - engine.count, 0))"
-        case .stretch(_, let seconds): "\(Int((seconds * (1 - engine.progress)).rounded(.up)))s"
         default: ""
         }
     }

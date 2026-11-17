@@ -13,7 +13,7 @@ make it stay quiet is to complete a verified wake-up sequence.
 | Schedule | A wake time per weekday (default 07:30 Sun to Thu, 09:00 Fri and Sat; edited in a weekly calendar on the home screen, any day can be turned off). |
 | Emergency exit | A day can be excused in advance only: at least 6 hours before its alarm. |
 | Never-ending alarm | The in-app alarm rings from the first step until the front camera has counted 20 reps of the day's exercise (jumping jacks, squats, push-ups, or rotating daily). No fallback: nothing else silences it. |
-| Routine | From `docs/wake-protocol.md`: sit 10 s, lights, one set of 20 reps to stop the alarm, then straight into eight standing stretches (15 s each, camera-checked), face splash, water. |
+| Routine | From `docs/wake-protocol.md`: sit 10 s, lights, one set of 20 reps to stop the alarm, then straight into seven guided stretches (15 s each; side bends are one 10 s step, 5 s per side), face splash, water. Each stretch fills the screen with a demonstration photo, moves on by itself, is not camera-checked and can be skipped. |
 | Alarm sound | Five calming sounds synthesized by `tools/make_sounds.py` (chimes, singing bowl, ocean, harp, birds). The system alarm plays a file with a 20 s fade-in baked in; the in-app alarm ramps from 8% to full over 75 s (`AlarmVolumeRamp`) and jumps to full when a step runs over time. The phone's own volume setting still caps it. |
 | Camera framing | The phone can't see the whole body. The user is asked to step back once (`FramingGate`: head to hips in view), then everything is counted from shoulders and arms: jumping jacks by arms down/up/down, squats by how far the shoulders sink. Push-ups use the same shoulder-drop counter with the phone on the floor (no step back; measured in upper-arm lengths so side-on works). A white stick figure is drawn over the selfie preview. |
 | Look | Warm dawn palette (cream, peach, terracotta, sage) in `Theme.swift`, mirrored in the browser UI lab at `docs/ui-lab/index.html`. Motion follows the `emil-design-eng` skill in `.agents/skills`: presses shrink to 0.97 over 150 ms, one strong ease-out curve, UI under 300 ms, no bounce except the completion screen, staggered entrances, Reduce Motion respected. |
@@ -29,7 +29,7 @@ Packages/GoodMorningCore      Pure Swift, no Apple frameworks. Builds and tests 
   Routine.swift               Routine, RoutineStep, StepGoal (what verifies each step)
   RoutineEngine.swift         State machine: events in, effects out. No skip path.
   JumpingJackCounter.swift    Pose frames; jumping-jack and squat rep counters
-  Stretch.swift               The stretch set and per-stretch pose checks
+  Stretch.swift               The stretch set: titles, durations, demonstration photos
   AlarmPlanner.swift          Which alarms must exist (main + backups), streak maths
 
 App/GoodMorning               iPhone app: thin adapters around the core
@@ -84,9 +84,9 @@ enforcement is by consequence instead:
 - Pose thresholds are tuned on synthetic data only and need calibrating on a real body.
 - Counting from the upper body is easier to cheat: raising and lowering both arms counts as a jumping jack, and bobbing the shoulders counts as a squat.
 - The framing gate gives up after 15 s with a body in view and lets counting start anyway, so a badly placed phone can never trap the user with a ringing alarm.
-- A quad stretch can only be checked when the legs are in frame; otherwise staying in view counts.
+- Stretches are no longer verified: the photo is shown, the clock runs, and Skip moves on. The camera is only used for the 20 reps.
+- The stretch photos in `Assets.xcassets/stretch-*.imageset` are AI-generated (Higgsfield, Z Image model); the overhead-reach photo shows flat feet although the text says to rise onto the toes.
 - The stick figure assumes the camera frames are mirrored like the preview; if it appears flipped on device, that is the setting to fix (`PoseCameraSensor.configure`).
-- Stretches do not tell left from right; each side bend and quad stretch accepts either side.
 - Parts of the researched protocol are not built yet:
   - lights-on check from camera brightness (currently a tap)
   - QR/NFC anchor at the sink (currently a tap)

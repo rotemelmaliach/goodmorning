@@ -234,16 +234,6 @@ private func cropped(_ frame: PoseFrame, hips: Bool = true, hands: Bool = true) 
         #expect(step?.title == "20 push-ups to stop the alarm")
     }
 
-    @Test func stretchesWorkFromTheUpperBody() {
-        var reach = StretchTracker(stretch: .overheadReach)
-        _ = reach.ingest(cropped(pose(0, wristY: 0.9)))
-        #expect(reach.ingest(cropped(pose(0.25, wristY: 0.9))).credited == 0.25)
-        // Legs out of frame: a quad stretch can't be checked, so staying in view counts.
-        var quad = StretchTracker(stretch: .quadLeft)
-        _ = quad.ingest(cropped(pose(0)))
-        #expect(quad.ingest(cropped(pose(0.25))).credited == 0.25)
-    }
-
     @Test func framingGateAsksToStepBackThenLatchesReady() {
         var gate = FramingGate()
         #expect(gate.ingest(pose(0, confidence: 0.1)) == .noBody)
@@ -278,77 +268,82 @@ private func cropped(_ frame: PoseFrame, hips: Bool = true, hands: Bool = true) 
 }
 
 @Suite struct StretchTests {
-    @Test func holdOnlyAccruesWhileThePoseIsHeld() {
-        var tracker = StretchTracker(stretch: .overheadReach)
-        #expect(tracker.ingest(pose(0, wristY: 0.9)).credited == 0)  // first frame has no duration
-        #expect(tracker.ingest(pose(0.25, wristY: 0.9)).credited == 0.25)
-        #expect(tracker.ingest(pose(0.5)).credited == 0)  // arms dropped: paused
-        #expect(tracker.ingest(pose(0.75, wristY: 0.9, confidence: 0.1)) == .init(bodyVisible: false, credited: 0))
-    }
-
-    @Test func recognisesEachHeldStretch() {
-        func held(_ stretch: Stretch, _ frame: (TimeInterval) -> PoseFrame) -> Bool {
-            var tracker = StretchTracker(stretch: stretch)
-            _ = tracker.ingest(frame(0))
-            return tracker.ingest(frame(0.25)).credited > 0
-        }
-        let r1 = held(.sideBendLeft) { pose($0, wristY: 0.8, lean: 0.07) }
-        #expect(r1)
-        let r2 = held(.sideBendLeft) { pose($0, wristY: 0.8) }
-        #expect(!r2)
-        let r3 = held(.cactusArms) { pose($0, wristY: 0.78, elbowY: 0.7) }
-        #expect(r3)
-        let r4 = held(.cactusArms) { pose($0) }
-        #expect(!r4)
-        let r5 = held(.quadRight) { pose($0, leftAnkleY: 0.3) }
-        #expect(r5)
-        let r6 = held(.quadRight) { pose($0) }
-        #expect(!r6)
-    }
-
-    @Test func movingStretchesNeedContinuedMovement() {
-        var circles = StretchTracker(stretch: .armCircles)
-        _ = circles.ingest(pose(0, wristY: 0.9))
-        #expect(circles.ingest(pose(0.5, wristY: 0.4)).credited == 0.5)  // up -> down: moving
-        #expect(circles.ingest(pose(1, wristY: 0.9)).credited == 0.5)
-        // Arms stay up: credit runs out after the grace period.
-        #expect(circles.ingest(pose(1.5, wristY: 0.9)).credited > 0)
-        _ = circles.ingest(pose(3.75, wristY: 0.9))
-        #expect(circles.ingest(pose(4, wristY: 0.9)).credited == 0)
-
-        var twists = StretchTracker(stretch: .trunkTwists)
-        _ = twists.ingest(pose(0))
-        #expect(twists.ingest(pose(0.5, shoulderWidth: 0.07)).credited == 0.5)
-    }
-
-    @Test func engineCompletesStretchStepOnAccumulatedTime() {
+    @Test func stretchStepRunsOnTheClockAndCanBeSkipped() {
         let routine = Routine(
             name: "t",
-            steps: [RoutineStep(id: "s", title: "", instruction: "", goal: .stretch(.cactusArms, seconds: 15))]
+            steps: [
+                RoutineStep(id: "a", title: "", instruction: "", goal: .stretch(.cactusArms, seconds: 15), skippable: true),
+                RoutineStep(id: "b", title: "", instruction: "", goal: .stretch(.sideBends, seconds: 10), skippable: true),
+                RoutineStep(id: "c", title: "", instruction: "", goal: .confirm),
+            ]
         )
         var engine = RoutineEngine(routine: routine)
         _ = engine.start(at: t0)
-        #expect(engine.handle(.stretchHeld(.cactusArms, seconds: 10), at: t0 + 10).isEmpty)
-        #expect(engine.handle(.stretchHeld(.quadLeft, seconds: 10), at: t0 + 20).isEmpty)  // wrong stretch
-        #expect(engine.handle(.stretchHeld(.cactusArms, seconds: 5), at: t0 + 30).contains(.stepFinished(index: 0)))
+        #expect(engine.tick(at: t0 + 7.5).isEmpty)
+        #expect(engine.progress == 0.5)
+        #expect(engine.tick(at: t0 + 15).contains(.stepFinished(index: 0)))
+        // Skip moves past a stretch at once...
+        #expect(engine.handle(.skipped, at: t0 + 17).contains(.stepFinished(index: 1)))
+        // ...but does nothing on a step that isn't skippable.
+        #expect(engine.handle(.skipped, at: t0 + 18).isEmpty)
+        _ = engine.handle(.confirmed, at: t0 + 20)
+        guard case .finished(let summary) = engine.phase else {
+            Issue.record("expected finished")
+            return
+        }
+        #expect(summary.steps.map { $0.skipped } == [false, true, false])
+    }
+
+    @Test func sideBendsAreOneTenSecondStepFiveSecondsEachSide() {
+        #expect(Stretch.sideBends.seconds == 10)
+        #expect(Stretch.sideBends.phase(at: 0).label == "Lean left")
+        #expect(Stretch.sideBends.phase(at: 0.49).label == "Lean left")
+        #expect(Stretch.sideBends.phase(at: 0.5).label == "Lean right")
+        #expect(Stretch.sideBends.phase(at: 1).label == "Lean right")
+        #expect(Stretch.sideBends.phase(at: 0).mirrored != Stretch.sideBends.phase(at: 0.5).mirrored)
+        #expect(Stretch.cactusArms.seconds == 15)
+        #expect(Stretch.cactusArms.phases.count == 1)
+    }
+
+    @Test func oldHistoryWithoutSkippedStillDecodes() throws {
+        let old = Data(#"{"stepID":"sit","duration":10,"overTimeLimit":false}"#.utf8)
+        let record = try JSONDecoder().decode(StepRecord.self, from: old)
+        #expect(record == StepRecord(stepID: "sit", duration: 10, overTimeLimit: false))
     }
 }
 
 @Suite struct DefaultRoutineTests {
+    @Test func sequenceMatchesTheAgreedFlow() {
+        let steps = Routine.researchedDefault(wakeExercise: .jumpingJack).steps
+        #expect(steps.map { $0.id } == [
+            "sit", "lights", "wake-reps",
+            "stretch-armCircles", "stretch-overheadReach", "stretch-sideBends", "stretch-cactusArms",
+            "stretch-trunkTwists", "stretch-quadLeft", "stretch-quadRight",
+            "face", "water",
+        ])
+        // Only the stretches can be skipped, and only the 20 reps use the camera.
+        #expect(steps.filter { $0.skippable }.map { $0.id } == steps.filter { $0.id.hasPrefix("stretch-") }.map { $0.id })
+        let stretchSeconds: [TimeInterval] = steps.compactMap {
+            if case .stretch(_, let seconds) = $0.goal { return seconds }
+            return nil
+        }
+        #expect(stretchSeconds == [15, 15, 10, 15, 15, 15, 15])
+    }
+
     @Test func alarmRingsUntilTheCameraCountsTheWakeReps() {
         let routine = Routine.researchedDefault(wakeExercise: .squat)
         let wake = routine.steps.firstIndex { $0.id == "wake-reps" }!
         #expect(routine.steps[wake].goal == .reps(exercise: .squat, count: 20))
         #expect(routine.steps[...wake].allSatisfy { $0.alarmSounding })
         #expect(routine.steps[(wake + 1)...].allSatisfy { !$0.alarmSounding })
-        #expect(routine.steps.filter { $0.id.hasPrefix("stretch-") }.count == 8)
+        #expect(routine.steps.filter { $0.id.hasPrefix("stretch-") }.count == 7)
 
         var engine = RoutineEngine(routine: routine)
         _ = engine.start(at: t0)
         // Sit, lights, one set of reps, then straight into the stretches.
         #expect(routine.steps.prefix(4).map { $0.id } == ["sit", "lights", "wake-reps", "stretch-armCircles"])
         #expect(routine.steps.suffix(2).map { $0.id } == ["face", "water"])
-        #expect(routine.steps.count == 13)
+        #expect(routine.steps.count == 12)
         _ = engine.tick(at: t0 + 10)
         let afterLights = engine.handle(.confirmed, at: t0 + 40)
         #expect(afterLights == [.stepFinished(index: 1), .stepBegan(index: 2), .alarmSound(.normal)])
