@@ -38,8 +38,12 @@ public enum Stretch: String, Codable, Sendable, CaseIterable {
 /// Time only accrues while the pose is held (or the movement keeps going), so the step's
 /// countdown pauses whenever the user stops.
 ///
-/// Known limit: left and right are not told apart (a mirrored front camera makes that unreliable),
-/// so each side bend and quad stretch accepts either side.
+/// Every stretch is judged from the upper body, because the legs are usually out of frame.
+/// Known limits:
+/// - left and right are not told apart (a mirrored front camera makes that unreliable), so each
+///   side bend and quad stretch accepts either side;
+/// - a quad stretch can only be checked when the legs are visible. When they aren't, the time
+///   counts as long as the user stays in view.
 public struct StretchTracker: Sendable {
     public struct Output: Sendable, Equatable {
         public var bodyVisible: Bool
@@ -64,7 +68,7 @@ public struct StretchTracker: Sendable {
     public mutating func ingest(_ frame: PoseFrame) -> Output {
         let elapsed = lastFrameTime.map { min(max(frame.time - $0, 0), 0.5) } ?? 0
         lastFrameTime = frame.time
-        guard frame.isWholeBodyVisible(minConfidence: minConfidence) else {
+        guard frame.hasShoulders(minConfidence), needsArms ? armsSeen(frame) : true else {
             return Output(bodyVisible: false, credited: 0)
         }
 
@@ -81,13 +85,25 @@ public struct StretchTracker: Sendable {
         return Output(bodyVisible: true, credited: active ? elapsed : 0)
     }
 
+    private var needsArms: Bool {
+        switch stretch {
+        case .trunkTwists, .quadLeft, .quadRight: false
+        default: true
+        }
+    }
+
+    private func armsSeen(_ frame: PoseFrame) -> Bool {
+        let arms = frame.arms(minConfidence)
+        return arms.left != .unknown && arms.right != .unknown
+    }
+
     /// Which extreme of the movement the body is at: +1, -1, or nil when in between.
     private mutating func motionZone(_ frame: PoseFrame) -> Int? {
         switch stretch {
         case .armCircles:
-            let wristY = (frame.leftWrist.y + frame.rightWrist.y) / 2
-            if wristY > frame.shoulderY { return 1 }
-            if wristY < frame.hipY { return -1 }
+            let arms = frame.arms(minConfidence)
+            if arms.left == .up && arms.right == .up { return 1 }
+            if arms.left == .down && arms.right == .down { return -1 }
             return nil
         case .trunkTwists:
             // Rotating the trunk makes the shoulders look narrower from the front.
@@ -101,23 +117,36 @@ public struct StretchTracker: Sendable {
     }
 
     private func isHeld(_ frame: PoseFrame) -> Bool {
-        let torso = frame.torso
+        let torso = frame.torso(minConfidence)
+        let arms = frame.arms(minConfidence)
         switch stretch {
         case .overheadReach:
-            let line = frame.shoulderY + 0.6 * torso
-            return frame.leftWrist.y > line && frame.rightWrist.y > line
-        case .sideBendLeft, .sideBendRight:
-            // Trunk tilted at least 15 degrees from vertical (tan 15° ≈ 0.27), top arm overhead.
-            let lean = abs((frame.leftShoulder.x + frame.rightShoulder.x) / 2 - (frame.leftHip.x + frame.rightHip.x) / 2)
-            let topWrist = max(frame.leftWrist.y, frame.rightWrist.y)
-            return lean >= 0.27 * torso && topWrist > frame.shoulderY + 0.3 * torso
-        case .cactusArms:
-            func side(_ wrist: PosePoint, _ elbow: PosePoint, _ shoulder: PosePoint) -> Bool {
-                abs(elbow.y - shoulder.y) <= 0.3 * torso && wrist.y >= elbow.y + 0.25 * torso
+            // Wrists well above the shoulders; if the hands leave the top of the frame,
+            // raised elbows are enough.
+            func reaching(_ wrist: PosePoint, _ state: PoseFrame.ArmState) -> Bool {
+                wrist.confidence >= minConfidence ? wrist.y > frame.shoulderY + 0.6 * torso : state == .up
             }
-            return side(frame.leftWrist, frame.leftElbow, frame.leftShoulder)
-                && side(frame.rightWrist, frame.rightElbow, frame.rightShoulder)
+            return reaching(frame.leftWrist, arms.left) && reaching(frame.rightWrist, arms.right)
+        case .sideBendLeft, .sideBendRight:
+            // Trunk tilted at least 15 degrees (tan 15° ≈ 0.27): the shoulders shift sideways
+            // over the hips, or, with the hips out of frame, the shoulder line tilts.
+            let leaning: Bool
+            if frame.hasHips(minConfidence) {
+                let shift = (frame.leftShoulder.x + frame.rightShoulder.x) / 2 - (frame.leftHip.x + frame.rightHip.x) / 2
+                leaning = abs(shift) >= 0.27 * torso
+            } else {
+                leaning = abs(frame.leftShoulder.y - frame.rightShoulder.y) >= 0.2 * frame.shoulderWidth
+            }
+            return leaning && (arms.left == .up || arms.right == .up)
+        case .cactusArms:
+            func side(_ wrist: PosePoint, _ elbow: PosePoint) -> Bool {
+                frame.seen(wrist, elbow, minConfidence: minConfidence)
+                    && abs(elbow.y - frame.shoulderY) <= 0.3 * torso
+                    && wrist.y >= elbow.y + 0.25 * torso
+            }
+            return side(frame.leftWrist, frame.leftElbow) && side(frame.rightWrist, frame.rightElbow)
         case .quadLeft, .quadRight:
+            guard frame.hasLegs(minConfidence) else { return true }
             // One ankle lifted to the knee height of the standing leg.
             let margin = 0.1 * (frame.kneeY - min(frame.leftAnkle.y, frame.rightAnkle.y))
             return frame.leftAnkle.y >= frame.rightKnee.y - margin || frame.rightAnkle.y >= frame.leftKnee.y - margin

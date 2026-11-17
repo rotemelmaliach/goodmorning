@@ -1,53 +1,108 @@
 import AVFoundation
 import GoodMorningCore
+import Observation
 
-/// In-app alarm tone that keeps going while a step is unfinished. It synthesizes beeps,
-/// so no audio asset is needed; with the `audio` background mode it survives the screen locking.
+/// In-app alarm: loops the chosen calming sound while a step is unfinished. It starts barely
+/// audible and swells (`AlarmVolumeRamp`); with the `audio` background mode it survives the
+/// screen locking.
+@MainActor
 final class AlarmSoundPlayer {
-    private let engine = AVAudioEngine()
-    private let sampleRate = 44_100.0
-    private var sample = 0.0
+    var ramp = AlarmVolumeRamp()
+
+    private var player: AVAudioPlayer?
     private var level: AlarmSoundLevel = .off
-    private var attached = false
+    private var startedAt: Date?
+    private var timer: Timer?
 
     func set(_ level: AlarmSoundLevel) {
         self.level = level
-        if level == .off {
-            engine.stop()
+        guard level != .off else {
+            stop()
             return
+        }
+        if player == nil { start(Store.alarmSound) }
+        updateVolume(fade: level == .escalated ? 1.0 : 0)
+    }
+
+    private func start(_ sound: AlarmSound) {
+        guard let player = Sounds.player(for: sound.loopFile) else { return }
+        player.numberOfLoops = -1
+        player.volume = Float(ramp.startVolume)
+        player.play()
+        self.player = player
+        startedAt = .now
+        timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.updateVolume(fade: 1) }
+        }
+    }
+
+    private func stop() {
+        timer?.invalidate()
+        timer = nil
+        player?.setVolume(0, fadeDuration: 0.6)
+        let fading = player
+        player = nil
+        startedAt = nil
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) { fading?.stop() }
+    }
+
+    private func updateVolume(fade: TimeInterval) {
+        guard let player, let startedAt else { return }
+        let volume = Float(ramp.volume(elapsed: Date.now.timeIntervalSince(startedAt), level: level))
+        player.setVolume(volume, fadeDuration: fade)
+    }
+}
+
+/// Plays a few seconds of a sound from the picker on the home screen.
+@MainActor
+@Observable
+final class SoundPreview {
+    private(set) var playing: AlarmSound?
+    @ObservationIgnored private var player: AVAudioPlayer?
+    @ObservationIgnored private var stopTask: Task<Void, Never>?
+
+    func toggle(_ sound: AlarmSound) {
+        let wasPlaying = playing == sound
+        stop()
+        guard !wasPlaying, let player = Sounds.player(for: sound.loopFile) else { return }
+        player.volume = 0
+        player.play()
+        player.setVolume(0.7, fadeDuration: 1.5)
+        self.player = player
+        playing = sound
+        stopTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(8))
+            if !Task.isCancelled { self?.stop() }
+        }
+    }
+
+    func stop() {
+        stopTask?.cancel()
+        stopTask = nil
+        player?.stop()
+        player = nil
+        playing = nil
+    }
+}
+
+enum Sounds {
+    /// A ready-to-play player for a bundled sound file, with the audio session set to play
+    /// even when the phone's silent switch is on.
+    @MainActor
+    static func player(for fileName: String) -> AVAudioPlayer? {
+        guard let url = Bundle.main.url(forResource: fileName, withExtension: nil) else {
+            print("Missing sound file \(fileName)")
+            return nil
         }
         do {
             try AVAudioSession.sharedInstance().setCategory(.playback, options: [])
             try AVAudioSession.sharedInstance().setActive(true)
-            attachIfNeeded()
-            if !engine.isRunning { try engine.start() }
+            let player = try AVAudioPlayer(contentsOf: url)
+            player.prepareToPlay()
+            return player
         } catch {
             print("Alarm sound failed: \(error)")
+            return nil
         }
-    }
-
-    private func attachIfNeeded() {
-        guard !attached else { return }
-        attached = true
-        let format = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 1)!
-        let node = AVAudioSourceNode { [unowned self] _, _, frameCount, audioBufferList in
-            let escalated = self.level == .escalated
-            let frequency = escalated ? 1320.0 : 880.0
-            let period = escalated ? 0.2 : 0.5
-            let gain: Float = escalated ? 1.0 : 0.6
-            let buffers = UnsafeMutableAudioBufferListPointer(audioBufferList)
-            for frame in 0..<Int(frameCount) {
-                let time = self.sample / self.sampleRate
-                let beeping = time.truncatingRemainder(dividingBy: period) < period / 2
-                let value = beeping ? Float(sin(2 * .pi * frequency * time)) * gain : 0
-                self.sample += 1
-                for buffer in buffers {
-                    buffer.mData?.assumingMemoryBound(to: Float.self)[frame] = value
-                }
-            }
-            return noErr
-        }
-        engine.attach(node)
-        engine.connect(node, to: engine.mainMixerNode, format: format)
     }
 }

@@ -3,13 +3,26 @@ import Foundation
 public enum Exercise: String, Codable, Sendable, CaseIterable {
     case jumpingJack
     case squat
+    case pushUp
 
     public var title: String {
         switch self {
         case .jumpingJack: "Jumping jacks"
         case .squat: "Squats"
+        case .pushUp: "Push-ups"
         }
     }
+
+    /// How to place the phone so the camera can count this exercise.
+    public var setupInstruction: String {
+        switch self {
+        case .jumpingJack, .squat: "Prop the phone up and take a few steps back. Head to hips in view is enough."
+        case .pushUp: "Lean the phone against something on the floor and face it. Keep your head and shoulders in view."
+        }
+    }
+
+    /// Standing exercises ask the user to step back first; push-ups happen close to the phone.
+    public var needsStepBack: Bool { self != .pushUp }
 
     /// A different exercise each day, so the alarm can't be silenced on autopilot.
     public static func rotating(on day: Date, calendar: Calendar = .current) -> Exercise {
@@ -76,14 +89,13 @@ public struct Routine: Codable, Sendable, Equatable {
     /// the alarm never stops on its own. It rings from the first step until the camera has counted
     /// `wakeReps` of `wakeExercise`. There is no fallback and no other way to silence it.
     ///
-    /// Steps whose sensor isn't built yet (lights, march, sink anchor) use a timer or a tap for now.
+    /// After that single set of reps the routine goes straight into the stretch sequence.
+    /// Steps whose sensor isn't built yet (lights, sink anchor) use a tap for now.
     public static func researchedDefault(
         wakeExercise: Exercise,
         wakeReps: Int = 20,
         stretchSeconds: TimeInterval = 15
     ) -> Routine {
-        // On days when jumping jacks already stopped the alarm, the main set is halved.
-        let mainJacks = wakeExercise == .jumpingJack ? 20 : 40
         var steps = [
             RoutineStep(
                 id: "sit",
@@ -103,23 +115,10 @@ public struct Routine: Codable, Sendable, Equatable {
             RoutineStep(
                 id: "wake-reps",
                 title: "\(wakeReps) \(wakeExercise.title.lowercased()) to stop the alarm",
-                instruction: "Prop the phone up and step back until your whole body is in frame.",
+                instruction: wakeExercise.setupInstruction,
                 goal: .reps(exercise: wakeExercise, count: wakeReps),
                 timeLimit: 120,
                 alarmSounding: true
-            ),
-            RoutineStep(
-                id: "march",
-                title: "March in place",
-                instruction: "Lift your knees for 20 seconds.",
-                goal: .timer(seconds: 20)
-            ),
-            RoutineStep(
-                id: "jumping-jacks",
-                title: "Jumping jacks",
-                instruction: "\(mainJacks) reps. Keep your whole body in frame.",
-                goal: .reps(exercise: .jumpingJack, count: mainJacks),
-                timeLimit: 120
             ),
         ]
         steps += Stretch.allCases.map {

@@ -1,3 +1,4 @@
+import ActivityKit
 import AlarmKit
 import AppIntents
 import GoodMorningCore
@@ -42,12 +43,14 @@ final class AlarmService {
             )
             let attributes = AlarmAttributes<WakeMetadata>(
                 presentation: AlarmPresentation(alert: alert),
-                tintColor: .orange
+                tintColor: Theme.terracotta
             )
             let configuration = AlarmManager.AlarmConfiguration<WakeMetadata>.alarm(
                 schedule: .fixed(planned.fireDate),
                 attributes: attributes,
-                stopIntent: StartRoutineIntent()
+                stopIntent: StartRoutineIntent(),
+                // Calming sound with a slow fade-in baked into the file, so it starts subtle.
+                sound: .named(Store.alarmSound.alarmFile)
             )
             _ = try await manager.schedule(id: UUID(), configuration: configuration)
         }
